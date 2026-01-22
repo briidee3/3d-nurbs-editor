@@ -1,0 +1,43 @@
+{
+  "name": "3d-nurbs-editor",
+  "version": "0.0.1",
+  "description": "Simple 3D NURBS editor",
+  "keywords": [
+    "nurbs",
+    "3d",
+    "editor"
+  ],
+  "homepage": "https://github.com/briidee3/3d-nurbs-editor#readme",
+  "bugs": {
+    "url": "https://github.com/briidee3/3d-nurbs-editor/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/briidee3/3d-nurbs-editor.git"
+  },
+  "license": "ISC",
+  "author": "Brianna D'Urso",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node main.js",
+    "start": "webpack serve --open",
+    "build": "webpack"
+  },
+  "dependencies": {
+    "jest": "^30.2.0",
+    "nurbs": "^1.1.1",
+    "three": "^0.182.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "css-loader": "^7.1.2",
+    "html-loader": "^5.1.0",
+    "sass-loader": "^16.0.6",
+    "style-loader": "^4.0.0",
+    "tslib": "^2.8.1",
+    "webpack": "^5.104.1",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.3"
+  }
+}
