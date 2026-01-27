@@ -5,6 +5,7 @@
 import path from "path";
 //import { fileURLToPath } from "node:url";
 import HtmlWebpackPlugin from "html-webpack-plugin"
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 
 //const __filename = fileURLToPath(import.meta.url);
 //const __dirname = path.dirname(__filename);
@@ -56,6 +57,14 @@ export default (env, argv) => {
                 template: "./src/index.html",
                 filename: "app/index.html",
                 path: "./dist"
+            }),
+            new CopyWebpackPlugin({
+                patterns: [
+                    { from: 'src/img', to: 'img', noErrorOnMissing: false },
+                    { from: 'src/app/manifest', to: 'simulator/manifest', noErrorOnMissing: true },
+                    { from: 'locales', to: 'locales', noErrorOnMissing: true },
+                    { from: 'LICENSE', to: '', noErrorOnMissing: true },
+                ],
             }),
         ],
         resolve: {
