@@ -10,6 +10,10 @@ TODO:
     - Allow dynamic control of scene and camera variables from a settings menu (e.g. FoV, cull planes)
     - Automatic aspect ratio adjustment whenever window is resized
 - Add functions to allow manipulation of NURBS surface texture grid density via a slider
+Mandatory:
+- check if all of each lens bound is entirely intersected by the grid. otherwise, no dice. if it's less than a threshold value of a difference, use nearest neighbor to get values for axes directions
+- figure out how to maintain constraints on NURBS surface, e.g. Conformal Mapping
+
 */
 
 import * as THREE from 'three';
@@ -35,36 +39,37 @@ function main() {
     const canvas = document.querySelector("#viewport");
     const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
     const scene = new THREE.Scene();
-    const sceneSetup = new BasicScene(3, {}, canvas, renderer, scene);
+    const sceneSetup = new BasicScene(2, {}, canvas, renderer, scene);
 
 
     // Scene setup
     sceneSetup.sceneObjects.camera.position.z = 5;
-    const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const boxMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
-    const cube = new THREE.Mesh(boxGeometry, boxMaterial);
-    sceneSetup.sceneObjects.scene.add(cube);
+
+    // const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
+    // const boxMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+    // const cube = new THREE.Mesh(boxGeometry, boxMaterial);
+    // sceneSetup.sceneObjects.scene.add(cube);
 
     // NURBS surface (example taken from https://threejs.org/examples/webgl_geometry_nurbs.html)
     {
         const nsControlPoints = [
             [
-                new THREE.Vector4( - 200, - 200, 100, 1 ),
-                new THREE.Vector4( - 200, - 100, - 200, 1 ),
-                new THREE.Vector4( - 200, 100, 250, 1 ),
-                new THREE.Vector4( - 200, 200, - 100, 1 )
+                new THREE.Vector4( - 200, - 200, 0, 1 ),
+                new THREE.Vector4( - 200, - 100, 0, 1 ),
+                new THREE.Vector4( - 200, 100, 0, 1 ),
+                new THREE.Vector4( - 200, 200, 0, 1 )
             ],
             [
                 new THREE.Vector4( 0, - 200, 0, 1 ),
-                new THREE.Vector4( 0, - 100, - 100, 5 ),
-                new THREE.Vector4( 0, 100, 150, 5 ),
+                new THREE.Vector4( 0, - 100, 0, 5 ),
+                new THREE.Vector4( 0, 100, 0, 5 ),
                 new THREE.Vector4( 0, 200, 0, 1 )
             ],
             [
-                new THREE.Vector4( 200, - 200, - 100, 1 ),
-                new THREE.Vector4( 200, - 100, 200, 1 ),
-                new THREE.Vector4( 200, 100, - 250, 1 ),
-                new THREE.Vector4( 200, 200, 100, 1 )
+                new THREE.Vector4( 200, - 200, 0, 1 ),
+                new THREE.Vector4( 200, - 100, 0, 1 ),
+                new THREE.Vector4( 200, 100, 0, 1 ),
+                new THREE.Vector4( 200, 200, 0, 1 )
             ]
         ];
         const degree1 = 2;
@@ -85,7 +90,7 @@ function main() {
         const geometry = new ParametricGeometry( getSurfacePoint, 20, 20 );
         const material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
         const object = new THREE.Mesh( geometry, material );
-        object.position.set( - 400, 100, 0 );
+        object.position.set( 0, 0, 0 );
         object.scale.multiplyScalar( 1 );
 
         sceneSetup.sceneObjects.scene.add( object );

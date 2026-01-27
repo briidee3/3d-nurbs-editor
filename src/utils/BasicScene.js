@@ -16,6 +16,7 @@ TODO:
 import * as THREE from 'three';
 import WebGL from 'three/addons/capabilities/WebGL.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
 import { NURBSCurve } from 'three/addons/curves/NURBSCurve.js';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
@@ -42,54 +43,11 @@ export default class BasicScene {
         this.viewportResizeObserver = {};
         
         // Handle if 2D or 3D
-        if (dimension === 2) this.initAs2D();
-        else this.initAs3D();
+        if (dimension === 2) 
+            this.initAs2D();
+        else 
+            this.initAs3D();
     }
-
-    // getSceneObjects() {
-    //     return this.sceneObjects;
-    // }
-
-    // setSceneObject(name, obj) {
-    //     this.sceneObjects[name] = obj;
-
-    //     return this.sceneObjects;
-    // }
-
-    // setSceneObjectParam(objName, paramName, value) {
-    //     // Check if sub-properties in use
-    //     if (! paramName.includes(".") ) {
-    //         this.sceneObjects[objName[paramName]] = value;
-    //     }
-    //     else {
-    //         const numSubs = (paramName.match(/\./g) || []).length;
-    //         for (i in Range(numSubs)) {
-
-    //         }
-    //     }
-
-    //     return this.sceneObjects[objName];
-    // }
-
-    // getSceneParams() {
-    //     return this.sceneParams;
-    // }
-
-    // setSceneParam(name, param) {
-    //     this.sceneParams[name] = param;
-
-    //     return this.sceneParams;
-    // }
-
-    // getObjects() {
-    //     return this.objects;
-    // }
-
-    // setObject(name, obj) {
-    //     this.objects[name] = obj; scene
-
-    //     return this.objects;
-    // }
 
     // Handle window resizing (modified from THREEjs FAQ @ https://threejs.org/manual/#en/faq)
     onViewportResize(renderer) {
@@ -138,20 +96,22 @@ export default class BasicScene {
         // this.sceneObjects.renderer.setSize(window.innerWidth, window.innerHeight);  
 
         // Add basic lighting
-        this.sceneParams.ambientLightingColor = 0xFFFFFF;
-        this.sceneParams.ambientLightingIntensity = 0.5;
-        this.sceneObjects.ambientLight = new THREE.AmbientLight(this.sceneParams.ambientLightingColor, this.sceneParams.ambientLightingIntensity);
-        this.sceneObjects.scene.add(this.sceneObjects.ambientLight);
-        this.sceneParams.directionalLightingColor = 0xFFFFFF;
-        this.sceneParams.directionalLightingIntensity = 2.5;
-        this.sceneObjects.directionalLight = new THREE.DirectionalLight(this.sceneParams.directionalLightingColor, this.sceneParams.directionalLightingIntensity);
-        this.sceneObjects.directionalLight.position.set(-1, 2, 4);
-        this.sceneObjects.scene.add(this.sceneObjects.directionalLight);
-        this.sceneParams.directionalLightingColor2 = 0xFFFFF0;
-        this.sceneParams.directionalLightingIntensity2 = 1.5;
-        this.sceneObjects.directionalLight2 = new THREE.DirectionalLight(this.sceneParams.directionalLightingColor2, this.sceneParams.directionalLightingIntensity2);
-        this.sceneObjects.directionalLight2.position.set(5, -3, 1);
-        this.sceneObjects.scene.add(this.sceneObjects.directionalLight2);
+        this.sceneParams.lighting = {};
+        this.sceneObjects.lighting = {};
+        this.sceneParams.lighting.ambientLightingColor = 0xFFFFFF;
+        this.sceneParams.lighting.ambientLightingIntensity = 0.5;
+        this.sceneObjects.lighting.ambientLight = new THREE.AmbientLight(this.sceneParams.lighting.ambientLightingColor, this.sceneParams.lighting.ambientLightingIntensity);
+        this.sceneObjects.scene.add(this.sceneObjects.lighting.ambientLight);
+        this.sceneParams.lighting.directionalLightingColor = 0xFFFFFF;
+        this.sceneParams.lighting.directionalLightingIntensity = 2.5;
+        this.sceneObjects.lighting.directionalLight = new THREE.DirectionalLight(this.sceneParams.lighting.directionalLightingColor, this.sceneParams.lighting.directionalLightingIntensity);
+        this.sceneObjects.lighting.directionalLight.position.set(-1, 2, 4);
+        this.sceneObjects.scene.add(this.sceneObjects.lighting.directionalLight);
+        this.sceneParams.lighting.directionalLightingColor2 = 0xFFFFF0;
+        this.sceneParams.lighting.directionalLightingIntensity2 = 1.5;
+        this.sceneObjects.lighting.directionalLight2 = new THREE.DirectionalLight(this.sceneParams.lighting.directionalLightingColor2, this.sceneParams.lighting.directionalLightingIntensity2);
+        this.sceneObjects.lighting.directionalLight2.position.set(5, -3, 1);
+        this.sceneObjects.scene.add(this.sceneObjects.lighting.directionalLight2);
 
         // Adding axes
         this.sceneObjects.axes = new THREE.AxesHelper(1);
@@ -159,12 +119,73 @@ export default class BasicScene {
 
         // Set up orbital controls
         this.sceneObjects.controls = new OrbitControls(this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
+        this.sceneObjects.controls.cursorZoom = true;
+        this.sceneObjects.controls.mouseButtons.LEFT = null;
+
+        this.setupViewportResizeObjserver();
+    }
+
+    initAs2D() {
+
+        // Set up environment
+        this.sceneObjects.renderer = this.sceneObjects.renderer || new THREE.WebGLRenderer({ antialias: true, canvas: this.sceneObjects.canvas });
+        
+        this.sceneParams.cullNear = -1000;//0.1;                                   // Near cull plane
+        this.sceneParams.cullFar = 2000;                                   // Far cull plane
+
+        // Used for resizing window
+        this.sceneParams.tanFov = Math.tan((Math.PI / 180) * this.sceneParams.fov / 2);
+        this.sceneParams.initViewportHeight = this.sceneObjects.canvas.clientHeight;
+
+        // Set up scene and camera.
+        this.sceneObjects.scene = this.sceneObjects.scene || new THREE.Scene();
+        // this.sceneObjects.camera = this.sceneObjects.camera || new THREE.OrthographicCamera(
+        //     this.sceneObjects.canvas.clientWidth / -2, this.sceneObjects.canvas.clientWidth / 2, 
+        //     this.sceneObjects.canvas.clientHeight / -2, this.sceneObjects.canvas.clientHeight / 2,
+        //     this.sceneParams.cullNear, this.sceneParams.cullFar
+        // );
+        this.sceneObjects.camera = this.sceneObjects.camera || new THREE.OrthographicCamera(
+            0, this.sceneObjects.canvas.clientWidth, 
+            this.sceneObjects.canvas.clientHeight, 0,
+            this.sceneParams.cullNear, this.sceneParams.cullFar
+        );
+        
+        // Add outlines to objects
+        var renderingOutline = false;
+        this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
+        this.sceneObjects.scene.onAfterRender = () => {
+            if (renderingOutline) return;
+            renderingOutline = true;
+            this.sceneObjects.outlineEffect.renderOutline(this.sceneObjects.scene, this.sceneObjects.camera);
+            renderingOutline = false;
+        }
+
+        //camera.position.set(0, 10, 20);     // Set camera position
+
+        // this.sceneObjects.renderer.setSize(window.innerWidth, window.innerHeight);  
+
+        // Add basic lighting
+        this.sceneParams.lighting = {};
+        this.sceneObjects.lighting = {};
+        this.sceneParams.lighting.ambientLightingColor = 0xFFFFFF;
+        this.sceneParams.lighting.ambientLightingIntensity = 2;
+        this.sceneObjects.lighting.ambientLight = new THREE.AmbientLight(this.sceneParams.lighting.ambientLightingColor, this.sceneParams.lighting.ambientLightingIntensity);
+        this.sceneObjects.scene.add(this.sceneObjects.lighting.ambientLight);
+
+        // Adding axes
+        this.sceneObjects.axes = new THREE.AxesHelper(1);
+        this.sceneObjects.scene.add(this.sceneObjects.axes);
+
+        // Set up controls
+        this.sceneObjects.controls = new OrbitControls(this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
+        this.sceneObjects.controls.cursorZoom = true;
+        this.sceneObjects.controls.mouseButtons.LEFT = null;
+        this.sceneObjects.controls.enableRotate = false;
 
         this.setupViewportResizeObjserver();
     }
 
     setupViewportResizeObjserver() {
-
         // Create resize observer for viewport
         this.viewportResizeObserver = new ResizeObserver(entries => { 
             // Resize the viewport for the first element, assuming it is the viewport canvas. 
@@ -184,7 +205,7 @@ export default class BasicScene {
                             
                             // Update aspect ratio and Field of View accordingly
                             this.sceneObjects.camera.aspect = width / height;
-                            this.sceneObjects.camera.fov = (360 / Math.PI) * Math.atan(this.sceneParams.tanFov * (height / this.sceneParams.initViewportHeight));
+                            if (this.dimension > 2) this.sceneObjects.camera.fov = (360 / Math.PI) * Math.atan(this.sceneParams.tanFov * (height / this.sceneParams.initViewportHeight));
 
                             this.sceneObjects.camera.updateProjectionMatrix();
                             this.sceneObjects.camera.lookAt(this.sceneObjects.scene.position);
@@ -198,10 +219,6 @@ export default class BasicScene {
 
         // Check for resizes of viewport
         this.viewportResizeObserver.observe(this.sceneObjects.renderer.domElement);
-    }
-
-    initAs2D() {
-        //
     }
 
     defaultAnimateLoop() {
