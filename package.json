@@ -26,6 +26,7 @@
   "dependencies": {
     "jest": "^30.2.0",
     "nurbs": "^1.1.1",
+    "split.js": "^1.6.5",
     "three": "^0.182.0"
   },
   "private": true,
