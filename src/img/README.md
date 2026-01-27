@@ -1,0 +1,1 @@
+`uv_grid_opengl.jpg` taken from https://github.com/mrdoob/three.js/blob/master/examples/textures/uv_grid_opengl.jpg
