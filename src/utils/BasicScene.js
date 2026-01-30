@@ -173,8 +173,8 @@ export default class BasicScene {
         this.sceneObjects.scene.add(this.sceneObjects.lighting.ambientLight);
 
         // Adding axes
-        this.sceneObjects.axes = new THREE.AxesHelper(1);
-        this.sceneObjects.scene.add(this.sceneObjects.axes);
+        // this.sceneObjects.axes = new THREE.AxesHelper(1);
+        // this.sceneObjects.scene.add(this.sceneObjects.axes);
 
         // Set up controls
         this.sceneObjects.controls = new OrbitControls(this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
@@ -205,10 +205,16 @@ export default class BasicScene {
                             
                             // Update aspect ratio and Field of View accordingly
                             this.sceneObjects.camera.aspect = width / height;
-                            if (this.dimension > 2) this.sceneObjects.camera.fov = (360 / Math.PI) * Math.atan(this.sceneParams.tanFov * (height / this.sceneParams.initViewportHeight));
+                            if (this.sceneObjects.camera instanceof THREE.PerspectiveCamera) {
+                                this.sceneObjects.camera.fov = (360 / Math.PI) * Math.atan(this.sceneParams.tanFov * (height / this.sceneParams.initViewportHeight));
+                                this.sceneObjects.camera.lookAt(this.sceneObjects.scene.position);
+                            }
+                            else { //assuming only alternative is orthographic
+                                this.sceneObjects.camera.right = width;
+                                this.sceneObjects.camera.top = height;
+                            }
 
                             this.sceneObjects.camera.updateProjectionMatrix();
-                            this.sceneObjects.camera.lookAt(this.sceneObjects.scene.position);
                         }
                         break;
                     default:
