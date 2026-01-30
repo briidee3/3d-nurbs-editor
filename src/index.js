@@ -14,6 +14,9 @@ Mandatory:
 - check if all of each lens bound is entirely intersected by the grid. otherwise, no dice. if it's less than a threshold value of a difference, use nearest neighbor to get values for axes directions
 - figure out how to maintain constraints on NURBS surface, e.g. Conformal Mapping
 
+- # ctrl pts x
+- # ctrl pts y
+
 */
 
 import * as THREE from 'three';
@@ -26,6 +29,7 @@ import { NURBSVolume } from 'three/addons/curves/NURBSVolume.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 
 import BasicScene from './utils/BasicScene.js';
+import './utils/SplitElements.js';
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -52,6 +56,32 @@ function main() {
 
     // NURBS surface (example taken from https://threejs.org/examples/webgl_geometry_nurbs.html)
     {
+        // Object
+        // const nsControlPoints = [
+        //     [
+        //         new THREE.Vector3( -200, - 200, 0),
+        //         new THREE.Vector3( - 200, - 100, 0),
+        //         new THREE.Vector3( - 200, 100, 0),
+        //         new THREE.Vector3( - 200, 200, 0),
+        //     // ],
+        //     // [
+        //         new THREE.Vector3( 0, - 200, 0),
+        //         new THREE.Vector3( 0, - 100, 0),
+        //         new THREE.Vector3( 0, 100, 0),
+        //         new THREE.Vector3( 0, 200, 0),
+        //     // ],
+        //     // [
+        //         new THREE.Vector3( 200, - 200, 0),
+        //         new THREE.Vector3( 200, - 100, 0),
+        //         new THREE.Vector3( 200, 100, 0),
+        //         new THREE.Vector3( 200, 200, 0)
+        //     ]
+        // ];
+        // const weights = [
+        //     1, 1, 1, 1, 
+        //     1, 5, 5, 1,
+        //     1, 1, 1, 1
+        // ];
         const nsControlPoints = [
             [
                 new THREE.Vector4( - 200, - 200, 0, 1 ),
@@ -72,12 +102,40 @@ function main() {
                 new THREE.Vector4( 200, 200, 0, 1 )
             ]
         ];
+
+        // Display control points of NURBS surface, and set nsControlPoints to point to these new ones for use by NURBS surface
+        const nurbsCtrlPts = [];
+        for (row in nsControlPoints.length) {
+            nurbsCtrlPts.push([]);
+            for (col in nsControlPoints[row].length) {
+                nurbsCtrlPts[row].push(new THREE.Points(
+                    new THREE.BufferGeometry().setFromPoints(nsControlPoints[0], nsControlPoints[1], nsControlPoints[2]),
+                    new THREE.PointsMaterial({
+                        color: 0xFFFFFF,
+                        size: 100
+                    })
+                ));
+                sceneSetup.sceneObjects.scene.add(nurbsCtrlPts[row][col]);
+                nsControlPoints[row][col] = new THREE.Vector4(nurbsCtrlPts[row][col].position.getX(0), nurbsCtrlPts[row][col].position.getY(0), 1, nsControlPoints[row][col].getW(0));
+            }
+        }
+        // sceneSetup.sceneObjects.scene.add(
+        //     new THREE.Points(
+        //         new THREE.BufferGeometry().setFromPoints(nsControlPoints),
+        //         new THREE.PointsMaterial({
+        //             color: 0xFFFFFF,
+        //             size: 100
+        //         })
+        //     )
+        // );
+        
         const degree1 = 2;
         const degree2 = 3;
         const knots1 = [ 0, 0, 0, 1, 1, 1 ];
         const knots2 = [ 0, 0, 0, 0, 1, 1, 1, 1 ];
         const nurbsSurface = new NURBSSurface( degree1, degree2, knots1, knots2, nsControlPoints );
 
+        // Material
         const map = new THREE.TextureLoader().load( '../img/uv_grid_opengl.jpg' );
         map.wrapS = map.wrapT = THREE.RepeatWrapping;
         map.anisotropy = 16;
@@ -90,13 +148,13 @@ function main() {
         const geometry = new ParametricGeometry( getSurfacePoint, 20, 20 );
         const material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
         const object = new THREE.Mesh( geometry, material );
-        object.position.set( 0, 0, 0 );
+        object.position.set( sceneSetup.sceneObjects.canvas.clientWidth / 2, sceneSetup.sceneObjects.canvas.clientHeight / 2, 0 );
         object.scale.multiplyScalar( 1 );
 
         sceneSetup.sceneObjects.scene.add( object );
 
     }
-    
+
     sceneSetup.runRenderLoop(document, sceneSetup.defaultAnimateLoop());
     console.log(sceneSetup.sceneObjects.scene);
 }
