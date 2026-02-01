@@ -32,7 +32,7 @@ export default class BasicScene {
 
     constructor(dimension, objects, canvas, renderer, scene, camera) {
         this.dimension = dimension;
-        this.objects = objects;
+        this.objects = objects || [];
         this.sceneObjects = {
             canvas: canvas, 
             scene: scene,
@@ -82,7 +82,7 @@ export default class BasicScene {
         this.sceneObjects.camera = this.sceneObjects.camera || new THREE.PerspectiveCamera(this.sceneParams.fov, this.sceneParams.aspect, this.sceneParams.cullNear, this.sceneParams.cullFar); // FoV, aspect ratio, near clipping plane, far clipping plane
         
         // Add outlines to objects
-        var renderingOutline = false;
+        const renderingOutline = false;
         this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
         this.sceneObjects.scene.onAfterRender = () => {
             if (renderingOutline) return;
@@ -229,7 +229,6 @@ export default class BasicScene {
 
     defaultAnimateLoop() {
         this.sceneObjects.renderer.render(this.sceneObjects.scene, this.sceneObjects.camera);
-        console.log("test");
     }
 
     runRenderLoop(doc, animateLoop) {
