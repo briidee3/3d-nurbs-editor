@@ -52,32 +52,6 @@ const geomResolution = 20;          // Set num slices for NURBS parametric geome
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
 
 
-// Set up controls for nurbs
-function nurbsControls(nurbsParams, nurbsObj) {
-    const ctrlsDiv = document.querySelector("#controls");
-
-    
-    // Weights
-    // {
-    //     const weightsDiv = document.createElement("div");
-    //     weightsDiv.setAttribute("id", "weights-div");
-    //     ctrlsDiv.appendChild(weightsDiv);
-
-    //     const weightsLbl = document.createElement("label");
-    //     weightsLbl.setAttribute("id", "weights-label");
-    //     weightsLbl.textContent = "Weights:";
-    //     weightsDiv.appendChild(weightsLbl);
-
-    //     const weightsForms
-    // }
-
-    const objForm = document.createElement("form");
-    objForm.setAttribute("type", "text");
-    objForm.setAttribute("name", "object");
-    objForm.setAttribute("placeholder", "nurbsParams");
-}
-
-
 
 // Scene setup
 // ------------------------------------
@@ -188,6 +162,12 @@ function main() {
         nurbsObj.geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
     }
 
+    function updateNurbsPoint(indices, position) {
+        nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].x = position.x;
+        nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].y = position.y;
+        nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].z = position.z;
+    }
+
     // Add NURBS after its pts so pts get checked for intersection first
     makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
@@ -200,9 +180,14 @@ function main() {
     grid.position.z = -1.1;
     sceneSetup.sceneObjects.scene.add(grid);
 
-
     // Handle mouse movement (ref: https://sbcode.net/threejs/mousepick/)
     const mouse = new THREE.Vector2(0,0);
+
+
+    function guiNurbsCtrls() {
+        
+    }
+
 
     // Group to hold objects being moved
     const dragGroup = new THREE.Group();
@@ -292,6 +277,14 @@ function main() {
             const state = prevStates.pop();
             nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined' && state.object.parent.name === 'nurbs') {
+                updateNurbsPoint(state.object.name.split(","), state.object.position);
+                updateNurbs(nurbsParams, nurbsObj);
+            }
+
         } else {
             console.warn("Undo event triggered. Nothing to undo!");
         }
@@ -302,6 +295,13 @@ function main() {
             const state = nextStates.pop();
             prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined' && state.object.parent.name === 'nurbs') {
+                updateNurbsPoint(state.object.name.split(","), state.object.position);
+                updateNurbs(nurbsParams, nurbsObj);
+            }
         } else {
             console.warn("Redo event triggered. Nothing to redo!");
         }
