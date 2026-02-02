@@ -157,6 +157,19 @@ function main() {
     }
 
     function updateNurbs(nurbsParams, nurbsObj) {
+        // Update weights
+        var curRow = 0;
+        var curCol = 0;
+        nurbsParams.weights.forEach( (row) => {
+            row.forEach((col) => {
+                nurbsParams.ctrlPts[curRow][curCol].w = nurbsParams.weights[curRow][curCol];
+
+                curCol++;
+            });
+            curRow++;
+            curCol = 0;
+        });
+
         nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
         nurbsObj.geometry.dispose();
         nurbsObj.geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
@@ -183,10 +196,51 @@ function main() {
     // Handle mouse movement (ref: https://sbcode.net/threejs/mousepick/)
     const mouse = new THREE.Vector2(0,0);
 
-
-    function guiNurbsCtrls() {
+    
+    // Set up controls for nurbs
+    // function guiNurbsControls(nurbsJSON) {
+    {
+        const ctrlsDiv = document.querySelector("#controls");
         
+        // Weights
+        // {
+        //     const weightsDiv = document.createElement("div");
+        //     weightsDiv.setAttribute("id", "weights-div");
+        //     ctrlsDiv.appendChild(weightsDiv);
+
+        //     const weightsLbl = document.createElement("label");
+        //     weightsLbl.setAttribute("id", "weights-label");
+        //     weightsLbl.textContent = "Weights:";
+        //     weightsDiv.appendChild(weightsLbl);
+
+        //     const weightsForms
+        // }"
+
+        const objForm = document.createElement("form");
+        // objForm.setAttribute("onsubmit", "this.action=update_nurbs();");
+        objForm.setAttribute("id", "json-params-form");
+        const button = document.createElement("button");
+        button.innerText = "Update";
+        button.setAttribute("type", "button");
+        // button.setAttribute("text", "Update");
+        // objForm.setAttribute("type", "text");
+        // objForm.setAttribute("name", "object");
+        // objForm.setAttribute("placeholder", `${JSON.stringify(nurbsJSON)}`);
+        const textArea = document.createElement("textarea");
+        textArea.innerText = `${JSON.stringify(nurbsParams, null, 1)}`;
+
+        objForm.appendChild(textArea);
+        objForm.appendChild(button);
+        ctrlsDiv.appendChild(objForm);
+
+        button.addEventListener('click', (event) => {
+            const ctrlPts = nurbsParams.ctrlPts;  // save ctrl pts
+            nurbsParams = JSON.parse(textArea.value);
+            nurbsParams.ctrlPts = ctrlPts;
+            updateNurbs(nurbsParams, nurbsObj);
+        });
     }
+    // guiNurbsControls(nurbsParams);
 
 
     // Group to hold objects being moved
