@@ -71,7 +71,7 @@ export default class BasicScene {
         this.sceneParams.fov = 65;                                         // Field of vision
         this.sceneParams.aspect = this.sceneObjects.canvas.clientWidth / this.sceneObjects.canvas.clientHeight;// Aspect ratio
         this.sceneParams.cullNear = 0.1;                                   // Near cull plane
-        this.sceneParams.cullFar = 1000;                                   // Far cull plane
+        this.sceneParams.cullFar = 10000;                                   // Far cull plane
 
         // Used for resizing window
         this.sceneParams.tanFov = Math.tan((Math.PI / 180) * this.sceneParams.fov / 2);
@@ -82,14 +82,14 @@ export default class BasicScene {
         this.sceneObjects.camera = this.sceneObjects.camera || new THREE.PerspectiveCamera(this.sceneParams.fov, this.sceneParams.aspect, this.sceneParams.cullNear, this.sceneParams.cullFar); // FoV, aspect ratio, near clipping plane, far clipping plane
         
         // Add outlines to objects
-        const renderingOutline = false;
-        this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
-        this.sceneObjects.scene.onAfterRender = () => {
-            if (renderingOutline) return;
-            renderingOutline = true;
-            this.sceneObjects.outlineEffect.renderOutline(this.sceneObjects.scene, this.sceneObjects.camera);
-            renderingOutline = false;
-        }
+        // const renderingOutline = false;
+        // this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
+        // this.sceneObjects.scene.onAfterRender(() => {
+        //     if (renderingOutline) return;
+        //     renderingOutline = true;
+        //     this.sceneObjects.outlineEffect.renderOutline(this.sceneObjects.scene, this.sceneObjects.camera);
+        //     renderingOutline = false;
+        // });
 
         //camera.position.set(0, 10, 20);     // Set camera position
 
@@ -151,14 +151,14 @@ export default class BasicScene {
         );
         
         // Add outlines to objects
-        var renderingOutline = false;
-        this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
-        this.sceneObjects.scene.onAfterRender = () => {
-            if (renderingOutline) return;
-            renderingOutline = true;
-            this.sceneObjects.outlineEffect.renderOutline(this.sceneObjects.scene, this.sceneObjects.camera);
-            renderingOutline = false;
-        }
+        // var renderingOutline = false;
+        // this.sceneObjects.outlineEffect = new OutlineEffect( this.sceneObjects.renderer );
+        // this.sceneObjects.scene.onAfterRender(() => {
+        //     if (renderingOutline) return;
+        //     renderingOutline = true;
+        //     this.sceneObjects.outlineEffect.renderOutline(this.sceneObjects.scene, this.sceneObjects.camera);
+        //     renderingOutline = false;
+        // });
 
         //camera.position.set(0, 10, 20);     // Set camera position
 
