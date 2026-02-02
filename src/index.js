@@ -3,6 +3,14 @@
 // For now, this is essentially just something for use testing misc packages and setups.
 
 /*
+CONTROLS:
+- CTRL + Left Click + Drag: Move entire body with children when dragging
+- Left click + Drag: Move individual children of body
+- Right click + Drag: Pan
+*/
+
+
+/*
 TODO:
 - Add switches to toggle between different perspectives via the GUI
 - Set it up to only do within the dom element that it's baked into, rather than the entire window of the dom
@@ -21,6 +29,8 @@ Mandatory:
 
 good to have:
 - highlight place on sidebar w/ data for point/object being highlighted
+- left click to select surface, and only show control points then
+- selection box
 
 */
 
@@ -55,9 +65,11 @@ function main() {
     const sceneSetup = new BasicScene(2, [], canvas, renderer, scene);
     const raycaster = new THREE.Raycaster();
 
+    var ctrlKeyPressed = false;
+
 
     // Scene setup
-    sceneSetup.sceneObjects.camera.position.z = 5;
+    sceneSetup.sceneObjects.camera.position.z = 1000;
 
     // const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
     // const boxMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
@@ -167,31 +179,91 @@ function main() {
     nurbsObj.position.set( sceneSetup.sceneObjects.canvas.clientWidth / 2, sceneSetup.sceneObjects.canvas.clientHeight / 2, 0 );
     nurbsObj.scale.multiplyScalar( 1 );
 
-    sceneSetup.sceneObjects.scene.add(nurbsObj);
-    sceneSetup.objects.push(nurbsObj);   // For keeping track
-
-    // Set up points stuffs
-    const pts = [];
-    nsControlPoints.forEach((row) => { row.forEach( (vec4) => {
-        pts.push(new THREE.Vector3(vec4.x + nurbsObj.position.x, vec4.y + nurbsObj.position.y, vec4.z + nurbsObj.position.z));
-    })});
     const ptsMaterial = new THREE.PointsMaterial({
                             color: 0xFFFFFF,
                             size: sizeOfCtrlPts
                         })
-    const ptsGeom = new THREE.BufferGeometry().setFromPoints(pts);// + nurbsObj.position);  // Also adding nurbsObj position as offset
-    const ptsObj = new THREE.Points(ptsGeom, ptsMaterial);
-    //ptsObj.position.set(nurbsObj.position);
-    ptsObj.scale.multiplyScalar(1);
 
-    sceneSetup.sceneObjects.scene.add(ptsObj);
-    sceneSetup.objects.push(ptsObj);   // For keeping track
+    // Make points objects (one for each point) in scene based on controlPoints of parent, assuming the object has control points
+    function makePointsObjsFromNURBS(nurbs, nurbsObj) {
+        // const pts = [];
+        // nsControlPoints.forEach((row) => { row.forEach( (vec4) => {
+        //     pts.push(new THREE.Vector3(vec4.x + nurbsObj.position.x, vec4.y + nurbsObj.position.y, vec4.z + nurbsObj.position.z));
+        // })});
+        
+        // const ptsMaterial = new THREE.PointsMaterial({
+        //                         color: 0xFFFFFF,
+        //                         size: sizeOfCtrlPts
+        //                     })
+        // const ptsGeom = new THREE.BufferGeometry().setFromPoints(pts);// + nurbsObj.position);  // Also adding nurbsObj position as offset
+        // const ptsObj = new THREE.Points(ptsGeom, ptsMaterial);
+        // //ptsObj.position.set(nurbsObj.position);
+        // ptsObj.scale.multiplyScalar(1);
+
+        // sceneSetup.sceneObjects.scene.add(ptsObj);
+        // sceneSetup.objects.push(ptsObj);   // For keeping track
+
+        // var pts = [];
+        // var ptsObjs = [];
+        // var ptsGeoms = [];
+        nurbs.controlPoints.forEach((row) => { row.forEach( (vec4) => {
+            // pts.push(new THREE.Vector3(vec4.x + nurbsObj.position.x, vec4.y + nurbsObj.position.y, vec4.z + nurbsObj.position.z));
+
+            // const i = pts.length - 1;
+            // ptsGeoms.push(new THREE.BufferGeometry().setFromPoints(pts[i]));
+            // ptsObjs.push(new THREE.Points(ptsGeoms[i], ptsMaterial));
+            // var pt = new THREE.Points(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(vec4.x, vec4.y, vec4.z)]), ptsMaterial);
+            // // var pt = new THREE.Vector3(vec4.x, vec4.y, vec4.z);
+            // pt.scale.multiplyScalar(1);
+            // // var point = new THREE.Sphere(pt, 100);
+            // // console.log(pt.geometry);
+            // pt.geometry.computeBoundingSphere();
+            // pt.geometry.boundingSphere.set(pt.position, 1000);
+            // // pt.geometry.boundingSphere = point;
+            // // pt.geometry.computeBoundingBox();
+            // console.log(pt.geometry.boundingSphere);
+            // pt.addEventListener('mouseover', onMouseOver);
+            // pt.addEventListener('mouseleave', onMouseLeave);
+
+            var pt = new THREE.Mesh(
+                new THREE.SphereGeometry(sizeOfCtrlPts, 10, 10),
+                new THREE.MeshBasicMaterial({
+                    color: 0xFFFFFF
+                })
+            );
+            pt.position.set(vec4.x, vec4.y, vec4.z);
+
+            nurbsObj.add(pt); // Make current point child of parent
+
+            // sceneSetup.sceneObjects.scene.add(ptsObjs[i]);
+            sceneSetup.objects.push(pt);   // For keeping track
+        })});
+        
+        // + nurbsObj.position);  // Also adding nurbsObj position as offset
+        //ptsObj.position.set(nurbsObj.position);
+
+        // sceneSetup.sceneObjects.scene.add(ptsObj);
+        // sceneSetup.objects.push(ptsObj);   // For keeping track
+
+        // return { pts: pts, ptsObjs: ptsObjs, ptsGeoms: ptsGeoms };
+    }
 
 
+    // Add NURBS after its pts so pts get checked for intersection first
+    makePointsObjsFromNURBS(nurbsSurface, nurbsObj);
+
+    sceneSetup.sceneObjects.scene.add(nurbsObj);
+    sceneSetup.objects.push(nurbsObj);   // For keeping track
+
+    // Set up grid
+    const grid = new THREE.GridHelper(10000, 250);
+    grid.rotation.x = Math.PI * 0.5;
+    grid.position.z = -1.1;
+    sceneSetup.sceneObjects.scene.add(grid);
 
 
     // Handle mouse movement (ref: https://sbcode.net/threejs/mousepick/)
-    const mouse = new THREE.Vector2();
+    const mouse = new THREE.Vector2(0,0);
 
     // Group to hold objects being moved
     const dragGroup = new THREE.Group();
@@ -199,121 +271,76 @@ function main() {
 
     // Initialize drag controls
     const dragControls = new DragControls([ ... sceneSetup.objects ], sceneSetup.sceneObjects.camera, sceneSetup.sceneObjects.renderer.domElement);
-    // dragControls.addEventListener('drag', render);//onDrag);
     dragControls.addEventListener('dragstart', onDragStart);
+    dragControls.addEventListener('drag', onDrag);
     dragControls.addEventListener('dragend', onDragEnd);
+    dragControls.addEventListener('hoveron', onHoverOn);
+    dragControls.addEventListener('hoveroff', onHoverOff);
+    dragControls.rotateSpeed = 0;   // Effectively disable rotation
 
     // Set up drag controls (ref: https://github.com/mrdoob/three.js/blob/master/examples/misc_controls_drag.html)
     var prevStates = [];
     var nextStates = [];
-    // function onClick(event) {
-    //     event.preventDefault();
-    //     console.log("c");
-
-    //     // mouse.set((event.clientX / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 - 1, -(event.clientY / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 + 1);
-    //     // raycaster.setFromCamera(new THREE.Vector2(event.screenX, event.screenY), sceneSetup.sceneObjects.camera);
-
-    //     // const intersections = raycaster.intersectObjects(sceneSetup.objects, true);
-
-    //     const draggableObjects = dragControls.objects;
-
-    //     // if (intersections.length > 0) {
-    //     //     const curObj = intersections[0].object;
-
-    //     //     if (dragGroup.children.includes(curObj)) {
-    //     //         object.material.emissive.set(0x000000);
-    //     //         scene.attach(curObj);
-    //     //     } else {
-    //     //         object.material.emissive.set(0xaaaaaa);
-    //     //         scene.attach(curObj);
-    //     //     }
-    //     //     dragControls.transformGroup = true;
-    //     //     draggableObjects.push(group);
-    //     // }
-
-    //     if (dragGroup.children.length === 0) {
-    //         dragControls.transformGroup = false;
-    //         draggableObjects.push( ... sceneSetup.objects);
-    //     }
-
-    //     // render();
-    // }
-
-
-    // Set up callbacks for on drag in order to enable undo (CTRL+Z) functionality
-
-    // var wasDragging = false;
-
     function onDragStart(event) {
-        // raycaster.setFromCamera(new THREE.Vector2(event.screenX, event.screenY), sceneSetup.sceneObjects.camera);
-
-        // const intersections = raycaster.intersectObjects(sceneSetup.objects, true);
-        // // Undo functionality implementation with drag
-        // console.log("A");
-        // console.log(event);
-        
-        // // if (event instanceof DragControls && !wasDragging) {
-        // // Reset check var so this code only procs once per drag
-
-        // if (intersections.length > 0) {
-        //     const curObj = intersections[0].object;
-        //     mouse.set((event.clientX / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 - 1, -(event.clientY / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 + 1);
-            
-        //     // prevStates.push({ object: intersections[0].object, position: intersections[0].object.position });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
-        //     if (!wasDragging) {
-        //         wasDragging = true;
-        //         prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
-        //         nextStates.length = 0;                                                  // Wipe redo stack. NOTE: Should probably explicitly wipe the relevant memory, instead of depending on garbage collection (as is done currently)
-        //         console.log(prevStates);
-        //         console.log("B");
-        //     }
-
-        //     // if (dragGroup.children.includes(curObj)) {
-        //     //     object.material.emissive.set(0x000000);
-        //     //     scene.attach(curObj);
-        //     // } else {
-        //     //     object.material.emissive.set(0xaaaaaa);
-        //     //     scene.attach(curObj);
-        //     // }
-        //     // dragControls.transformGroup = true;
-        //     // draggableObjects.push(group);
-        // }
-        
-
-        // render();
-        // }
+        // Change look of object when dragging
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0xaaaaaa);}
 
-        const curObj = event.object;
-        mouse.set((event.clientX / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 - 1, -(event.clientY / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 + 1);
+        if (typeof event.object !== 'undefined') {
+            console.log(event.object);
 
-        prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
-        nextStates.length = 0;                                                  // Wipe redo stack. NOTE: Should probably explicitly wipe the relevant memory, instead of depending on garbage collection (as is done currently)
-        console.log(prevStates);
-        console.log("B");
+            // console.log(event.pageX);
+            // console.log(sceneSetup.sceneObjects.renderer.domElement.clientWidth);
+            // raycaster.setFromCamera(mouse, sceneSetup.sceneObjects.camera);
+            // raycaster.intersectObject(event.object);
+            // console.log(event.object.parent.raycast(raycaster));
+            // // console.log(event.object.position);
+            // console.log(mouse.x);
+            // console.log(mouse.manhattanDistanceTo(event.object.position));
+            // console.log(Math.sqrt(Math.pow(Math.abs(event.object.position.x - mouse.x), 2), Math.pow(Math.abs(event.object.position.y - mouse.y), 2)));
+
+            const curObj = event.object;
+            prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
+            nextStates.length = 0;                                                                          // Wipe nextStates
+        }
     }
-
     function onDragEnd(event) {
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
-        // wasDragging = false;
+
+        if (typeof event.object !== 'undefined') {
+        }
+
+    }
+    function onDrag(event) {
+        if (typeof event.object !== 'undefined') {
+            // Apply movement constraints (if any)
+            {
+                // Prevent changes to z axis position
+                event.object.position.z = prevStates.at(prevStates.length - 1).position.z;
+            }
+        }
+    }
+    // Handle hovering over and leaving
+    function onHoverOn(event) {
+        if (event.object.isPoints) {
+            event.object.material.color.set(0x111111);
+        }
+    }
+    function onHoverOff(event) {
+        if (event.object.isPoints) {
+            event.object.material.color.set(0xFFFFFF);
+        }
     }
 
-    
-    // Have points listen to mouse movement events
-    var ptsObjMousedown = false;
-    // ptsObj.addEventListener('mousedown', (event) => {
-    //     ptsObjMousedown = true;
-    // });
-    // ptsObj.addEventListener('mouseup', (event) => {
-    //     ptsObjMousedown = false;
-    // });    
-    // sceneSetup.sceneObjects.interactionManager.add(ptsObj);
+
+    function onClick(event) {
+        mouse.x = (event.clientX / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 - 1;
+        mouse.y = -(event.clientY / sceneSetup.sceneObjects.renderer.domElement.clientWidth) * 2 + 1;
+    }
 
     // Undo-ing functionality
     function onUndo(event) {
         if (prevStates.length > 0) {
             const state = prevStates.pop();
-            console.log(state);
             nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
         } else {
@@ -326,71 +353,64 @@ function main() {
             const state = nextStates.pop();
             prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
-
         } else {
             console.warn("Redo event triggered. Nothing to redo!");
         }
     }
 
     // Handle keyboard events
-    function handleKeys(event) {
+    function handleKeyDown(event) {
         if (event instanceof KeyboardEvent) {
             if (event.repeat) {return;} // Prevent holding down to undo or redo
             switch (event.key) {
                 case "z":
                     if (event.ctrlKey) {
                         onUndo(event);
-                        console.log("Undone");
                     }
                     break;
                 case "y":
                     if (event.ctrlKey) {
                         onRedo(event);
-                        console.log("Redone");
                     }
                     break;
                 default:
-                    //
-                // case "Undo":
-    // var wasDragging = false;
-
-    // function onDrag(event) {
-    //     // Undo functionality implementation with drag
-    //     if (event instanceof DragControls && !wasDragging) {
-    //         console.log("test");
-    //         // Reset check var so this code only procs once per drag
-    //         wasDragging = true;
-
-    //         render();
-    //     }
-    // }
-
-    // function onDragEnd(event) {
-    //     wasDragging = false;
-    // }
-                //     onUndo(event);
-                // case "Redo":
-                //     onRedo(event);
+            }
+            // Hold ctrl to move around parent + children together
+            if (event.ctrlKey) {
+                ctrlKeyPressed = true;
+            } else {
+                ctrlKeyPressed = false;
+            }
+        }
+    }
+    function handleKeyUp(event) {
+        if (event instanceof KeyboardEvent) {
+            switch (event.key) {
+                default:
+            }
+            // Hold ctrl to move around parent + children together
+            if (event.ctrlKey) {
+                ctrlKeyPressed = false;
             }
         }
     }
 
-    // function mouseEvents() {
-
-    // }
-
 
     function render() {
-        // console.log(wasDragging);
-        // Handle mouse events
-        // mouseEvents();
+        // Update things for scene
+        if (ctrlKeyPressed) {
+            dragControls.transformGroup = false;
+        }
+        console.log(ctrlKeyPressed);
 
-        // sceneSetup.sceneObjects.interactionManager.update();
+        // Render
         sceneSetup.sceneObjects.renderer.render(sceneSetup.sceneObjects.scene, sceneSetup.sceneObjects.camera);
     }
 
-    // document.addEventListener('click', onClick);
-    document.addEventListener('keydown', handleKeys);
+    document.addEventListener('click', onClick);
+    // document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     sceneSetup.runRenderLoop(document, render());//sceneSetup.defaultAnimateLoop());
 }
