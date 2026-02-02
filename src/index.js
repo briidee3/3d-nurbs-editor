@@ -77,13 +77,38 @@ function main() {
     // sceneSetup.sceneObjects.scene.add(cube);
 
     // NURBS surface (example taken from https://threejs.org/examples/webgl_geometry_nurbs.html)
+    var weights = [
+        [ 1, 1, 1, 1 ],
+        [ 1, 5, 5, 1 ],
+        [ 1, 1, 1, 1 ]
+    ];
     // Object
-    const nsControlPoints = [
+    // var nsControlPoints = [
+    //     [
+    //         new THREE.Vector4( - 200, - 200, 0, weights[0][0] ),
+    //         new THREE.Vector4( - 200, - 100, 0, weights[0][1] ),
+    //         new THREE.Vector4( - 200, 100, 0, weights[0][2] ),
+    //         new THREE.Vector4( - 200, 200, 0, weights[0][3] )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 0, - 200, 0, weights[1][0] ),
+    //         new THREE.Vector4( 0, - 100, 0, weights[1][1] ),
+    //         new THREE.Vector4( 0, 100, 0, weights[1][2] ),
+    //         new THREE.Vector4( 0, 200, 0, weights[1][3] )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 200, - 200, 0, weights[2][0] ),
+    //         new THREE.Vector4( 200, - 100, 0, weights[2][1] ),
+    //         new THREE.Vector4( 200, 100, 0, weights[2][2] ),
+    //         new THREE.Vector4( 200, 200, 0, weights[2][3] )
+    //     ]
+    // ];
+    var nsControlPoints = [
         [
             new THREE.Vector4( - 200, - 200, 0, 1 ),
             new THREE.Vector4( - 200, - 100, 0, 1 ),
             new THREE.Vector4( - 200, 100, 0, 1 ),
-            new THREE.Vector4( - 200, 200, 0, 1 )
+            new THREE.Vector4( - 200, 200, 0, 1 ),
         ],
         [
             new THREE.Vector4( 0, - 200, 0, 1 ),
@@ -99,69 +124,47 @@ function main() {
         ]
     ];
 
-    // Display control points of NURBS surface, and set nsControlPoints to point to these new ones for use by NURBS surface
-    // const ctrlPts = [
-    //     [
-    //         new THREE.Vector3( -200, - 200, 0),
-    //         new THREE.Vector3( - 200, - 100, 0),
-    //         new THREE.Vector3( - 200, 100, 0),
-    //         new THREE.Vector3( - 200, 200, 0),
-    //     // ],
-    //     // [
-    //         new THREE.Vector3( 0, - 200, 0),
-    //         new THREE.Vector3( 0, - 100, 0),
-    //         new THREE.Vector3( 0, 100, 0),
-    //         new THREE.Vector3( 0, 200, 0),
-    //     // ],
-    //     // [
-    //         new THREE.Vector3( 200, - 200, 0),
-    //         new THREE.Vector3( 200, - 100, 0),
-    //         new THREE.Vector3( 200, 100, 0),
-    //         new THREE.Vector3( 200, 200, 0)
-    //     ]
-    // ];
-    // const weights = [
-    //     1, 1, 1, 1, 
-    //     1, 5, 5, 1,
-    //     1, 1, 1, 1
-    // ];
-
-    // const nurbsCtrlPts = [];
-    // for (row in nsControlPoints.length) {
-    //     nurbsCtrlPts.push([]);
-    //     for (col in nsControlPoints[row].length) {
-    //         nurbsCtrlPts[row].push(new THREE.Points(
-    //             new THREE.BufferGeometry().setFromPoints(nsControlPoints[0], nsControlPoints[1], nsControlPoints[2]),
-    //             ptsMaterial
-    //         ));
-    //         sceneSetup.sceneObjects.scene.add(nurbsCtrlPts[row][col]);
-    //         nsControlPoints[row][col] = new THREE.Vector4(nurbsCtrlPts[row][col].position.getX(0), nurbsCtrlPts[row][col].position.getY(0), 1, nsControlPoints[row][col].getW(0));
-    //     }
-    // }
-    // const pts = new THREE.Points(
-    //                 new THREE.BufferGeometry().setFromPoints(ctrlPts),
-    //                 ptsMaterial
-    //             );
-    // pts.position.needsUpdate = true;
-    // sceneSetup.sceneObjects.scene.add(pts);
-
-    // for (row in nsControlPoints.length) {
-    //     nurbsCtrlPts.push([]);
-    //     for (col in nsControlPoints[row].length) {
-    //         nurbsCtrlPts[row].push(new THREE.Points(
-    //             new THREE.BufferGeometry().setFromPoints(nsControlPoints[0], nsControlPoints[1], nsControlPoints[2]),
-    //             ptsMaterial
-    //         ));
-    //         sceneSetup.sceneObjects.scene.add(nurbsCtrlPts[row][col]);
-    //         nsControlPoints[row][col] = new THREE.Vector4(nurbsCtrlPts[row][col].position.getX(0), nurbsCtrlPts[row][col].position.getY(0), 1, weights[row * nsPoints[row].length + col]);
-    //     }
-    // }
-    
+    // Display control points
     const degree1 = 2;
     const degree2 = 3;
     const knots1 = [ 0, 0, 0, 1, 1, 1 ];
     const knots2 = [ 0, 0, 0, 0, 1, 1, 1, 1 ];
-    const nurbsSurface = new NURBSSurface( degree1, degree2, knots1, knots2, nsControlPoints );
+
+    // // var nurbsParams = { degree1: degree1, degree2: degree2, knots1: knots1, knots2: knots2, ctrlPts: nsControlPoints, weights: weights };
+    // var nurbsParams = {
+    //     degree1: 2,
+    //     degree2: 3,
+    //     knots1: [ 0, 0, 0, 1, 1, 1 ],
+    //     knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
+    //     weights: [
+    //         [ 1, 1, 1, 1 ],
+    //         [ 1, 5, 5, 1 ],
+    //         [ 1, 1, 1, 1 ]
+    //     ] 
+    // };
+    // nurbsParams.ctrlPts = [
+    //     [
+    //         new THREE.Vector4( - 200, - 200, 0, nurbsParams.weights[0][0] ),
+    //         new THREE.Vector4( - 200, - 100, 0, nurbsParams.weights[0][1] ),
+    //         new THREE.Vector4( - 200, 100, 0, nurbsParams.weights[0][2] ),
+    //         new THREE.Vector4( - 200, 200, 0, nurbsParams.weights[0][3] )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 0, - 200, 0, nurbsParams.weights[1][0] ),
+    //         new THREE.Vector4( 0, - 100, 0, nurbsParams.weights[1][1] ),
+    //         new THREE.Vector4( 0, 100, 0, nurbsParams.weights[1][2] ),
+    //         new THREE.Vector4( 0, 200, 0, nurbsParams.weights[1][3] )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 200, - 200, 0, nurbsParams.weights[2][0] ),
+    //         new THREE.Vector4( 200, - 100, 0, nurbsParams.weights[2][1] ),
+    //         new THREE.Vector4( 200, 100, 0, nurbsParams.weights[2][2] ),
+    //         new THREE.Vector4( 200, 200, 0, nurbsParams.weights[2][3] )
+    //     ]
+    // ];
+
+    var nurbsSurface = new NURBSSurface( degree1, degree2, knots1, knots2, nsControlPoints );
+    // var nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
 
     // Material
     const map = new THREE.TextureLoader().load( '../img/uv_grid_opengl.jpg' );
@@ -173,16 +176,17 @@ function main() {
         return nurbsSurface.getPoint( u, v, target );
     }
 
-    const geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
-    const material = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
-    const nurbsObj = new THREE.Mesh( geometry, material );
+    const nurbsMaterial = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide } );
+    var nurbsGeometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
+    var nurbsObj = new THREE.Mesh( nurbsGeometry, nurbsMaterial );
+    nurbsObj.name = 'nurbs';
     nurbsObj.position.set( sceneSetup.sceneObjects.canvas.clientWidth / 2, sceneSetup.sceneObjects.canvas.clientHeight / 2, 0 );
     nurbsObj.scale.multiplyScalar( 1 );
 
     const ptsMaterial = new THREE.PointsMaterial({
                             color: 0xFFFFFF,
                             size: sizeOfCtrlPts
-                        })
+                        });
 
     // Make points objects (one for each point) in scene based on controlPoints of parent, assuming the object has control points
     function makePointsObjsFromNURBS(nurbs, nurbsObj) {
@@ -206,7 +210,12 @@ function main() {
         // var pts = [];
         // var ptsObjs = [];
         // var ptsGeoms = [];
-        nurbs.controlPoints.forEach((row) => { row.forEach( (vec4) => {
+        // nurbs.controlPoints.forEach((row) => { row.forEach( (vec4) => {
+        var curRow = 0;
+        var curCol = 0;
+        nsControlPoints.forEach((row) => { row.forEach( (vec4) => {
+        // console.log(nurbsParams.ctrlPts);
+        // nurbsParams.ctrlPts.forEach((row) => { row.forEach( (vec4) => {
             // pts.push(new THREE.Vector3(vec4.x + nurbsObj.position.x, vec4.y + nurbsObj.position.y, vec4.z + nurbsObj.position.z));
 
             // const i = pts.length - 1;
@@ -232,12 +241,25 @@ function main() {
                 })
             );
             pt.position.set(vec4.x, vec4.y, vec4.z);
+            pt.name = `${curRow},${curCol}`;
+
+            // nurbsParams.ctrlPts[curRow][curCol] = new THREE.Vector4(pt.position.x, pt.position.y, pt.position.z, nurbsParams.weights[curRow][curCol]);
+            // nurbsParams.ctrlPts[curRow][curCol].x = pt.position.x;
+            // nurbsParams.ctrlPts[curRow][curCol].y = pt.position.y;
+            // nurbsParams.ctrlPts[curRow][curCol].z = pt.position.z;
+            // nsControlPoints[curRow][curCol].x = pt.position.x;
+            // nsControlPoints[curRow][curCol].y = pt.position.y;
+            // nsControlPoints[curRow][curCol].z = pt.position.z;
+            nsControlPoints[curRow][curCol] = new THREE.Vector4(...pt.position, weights[curRow][curCol]);
 
             nurbsObj.add(pt); // Make current point child of parent
 
             // sceneSetup.sceneObjects.scene.add(ptsObjs[i]);
             sceneSetup.objects.push(pt);   // For keeping track
-        })});
+
+            curCol += 1;
+        }); curRow += 1; curCol = 0;
+        });
         
         // + nurbsObj.position);  // Also adding nurbsObj position as offset
         //ptsObj.position.set(nurbsObj.position);
@@ -307,6 +329,26 @@ function main() {
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
 
         if (typeof event.object !== 'undefined') {
+            // Regen NURBS mesh upon release
+            if (event.object.geometry.type === "SphereGeometry" && event.object.parent.name === 'nurbs') {
+                // const nurbsWorldParams = { pos: JSON.parse(JSON.stringify(nurbsObj.position)), scale: JSON.parse(JSON.stringify(nurbsObj.scale)), children: JSON.parse(JSON.stringify(nurbsObj.children)) };
+                console.log("testing");
+                const curId = event.object.name.split(",");
+                nsControlPoints[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
+                nsControlPoints[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
+                nsControlPoints[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
+                nurbsSurface = new NURBSSurface( degree1, degree2, knots1, knots2, nsControlPoints );
+                // nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
+                // nurbsGeometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
+                nurbsObj.geometry.dispose();
+                nurbsObj.geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
+                // nurbsObj = new THREE.Mesh( nurbsGeometry, nurbsMaterial );
+                // nurbsObj.scale.set(nurbsWorldParams.scale);
+                // nurbsObj.position.set(nurbsWorldParams.pos);
+                // nurbsObj.children = nurbsWorldParams.children;
+                // sceneSetup.sceneObjects.scene.children.shift();
+                // sceneSetup.sceneObjects.scene.add(nurbsObj);
+            }
         }
 
     }
