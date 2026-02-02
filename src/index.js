@@ -52,6 +52,33 @@ const geomResolution = 20;          // Set num slices for NURBS parametric geome
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
 
 
+// Set up controls for nurbs
+function nurbsControls(nurbsParams, nurbsObj) {
+    const ctrlsDiv = document.querySelector("#controls");
+
+    
+    // Weights
+    // {
+    //     const weightsDiv = document.createElement("div");
+    //     weightsDiv.setAttribute("id", "weights-div");
+    //     ctrlsDiv.appendChild(weightsDiv);
+
+    //     const weightsLbl = document.createElement("label");
+    //     weightsLbl.setAttribute("id", "weights-label");
+    //     weightsLbl.textContent = "Weights:";
+    //     weightsDiv.appendChild(weightsLbl);
+
+    //     const weightsForms
+    // }
+
+    const objForm = document.createElement("form");
+    objForm.setAttribute("type", "text");
+    objForm.setAttribute("name", "object");
+    objForm.setAttribute("placeholder", "nurbsParams");
+}
+
+
+
 // Scene setup
 // ------------------------------------
 function main() {
@@ -155,6 +182,12 @@ function main() {
         });
     }
 
+    function updateNurbs(nurbsParams, nurbsObj) {
+        nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
+        nurbsObj.geometry.dispose();
+        nurbsObj.geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
+    }
+
     // Add NURBS after its pts so pts get checked for intersection first
     makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
@@ -219,11 +252,9 @@ function main() {
                 nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
                 nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
                 nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
-                nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
 
                 // Replace the geometry
-                nurbsObj.geometry.dispose();
-                nurbsObj.geometry = new ParametricGeometry( getSurfacePoint, geomResolution, geomResolution );
+                updateNurbs(nurbsParams, nurbsObj);
             }
         }
 
@@ -240,7 +271,7 @@ function main() {
     // Handle hovering over and leaving
     function onHoverOn(event) {
         if (typeof event.object.material.color !== 'undefined') {
-            event.object.material.color.set(0x111111);
+            event.object.material.color.set(0xA0A0A0);
         }
     }
     function onHoverOff(event) {
