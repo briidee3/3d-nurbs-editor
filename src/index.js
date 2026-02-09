@@ -52,7 +52,6 @@ const geomResolution = 20;          // Set num slices for NURBS parametric geome
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
 
 
-
 // Scene setup
 // ------------------------------------
 function main() {
@@ -74,13 +73,14 @@ function main() {
 
     // Define NURBS
     var nurbsParams = {
-        degree1: 2,
+        degree1: 3,
         degree2: 3,
-        knots1: [ 0, 0, 0, 1, 1, 1 ],
+        knots1: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
         knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
         weights: [
             [ 1, 1, 1, 1 ],
-            [ 1, 5, 5, 1 ],
+            [ 1, 1, 1, 1 ],
+            [ 1, 1, 1, 1 ],
             [ 1, 1, 1, 1 ]
         ] 
     };
@@ -88,20 +88,26 @@ function main() {
         [
             new THREE.Vector4( - 200, - 200, 0, nurbsParams.weights[0][0] ),
             new THREE.Vector4( - 200, - 100, 0, nurbsParams.weights[0][1] ),
-            new THREE.Vector4( - 200, 100, 0, nurbsParams.weights[0][2] ),
-            new THREE.Vector4( - 200, 200, 0, nurbsParams.weights[0][3] )
+            new THREE.Vector4( - 200, 0, 0, nurbsParams.weights[0][2] ),
+            new THREE.Vector4( - 200, 100, 0, nurbsParams.weights[0][3] )
         ],
         [
-            new THREE.Vector4( 0, - 200, 0, nurbsParams.weights[1][0] ),
-            new THREE.Vector4( 0, - 100, 0, nurbsParams.weights[1][1] ),
-            new THREE.Vector4( 0, 100, 0, nurbsParams.weights[1][2] ),
-            new THREE.Vector4( 0, 200, 0, nurbsParams.weights[1][3] )
+            new THREE.Vector4( -100, - 200, 0, nurbsParams.weights[1][0] ),
+            new THREE.Vector4( -100, - 100, 0, nurbsParams.weights[1][1] ),
+            new THREE.Vector4( -100, 0, 0, nurbsParams.weights[1][2] ),
+            new THREE.Vector4( -100, 100, 0, nurbsParams.weights[1][3] )
         ],
         [
-            new THREE.Vector4( 200, - 200, 0, nurbsParams.weights[2][0] ),
-            new THREE.Vector4( 200, - 100, 0, nurbsParams.weights[2][1] ),
-            new THREE.Vector4( 200, 100, 0, nurbsParams.weights[2][2] ),
-            new THREE.Vector4( 200, 200, 0, nurbsParams.weights[2][3] )
+            new THREE.Vector4( 0, - 200, 0, nurbsParams.weights[2][0] ),
+            new THREE.Vector4( 0, - 100, 0, nurbsParams.weights[2][1] ),
+            new THREE.Vector4( 0, 0, 0, nurbsParams.weights[2][2] ),
+            new THREE.Vector4( 0, 100, 0, nurbsParams.weights[2][3] )
+        ],
+        [
+            new THREE.Vector4( 100, - 200, 0, nurbsParams.weights[3][0] ),
+            new THREE.Vector4( 100, - 100, 0, nurbsParams.weights[3][1] ),
+            new THREE.Vector4( 100, 0, 0, nurbsParams.weights[3][2] ),
+            new THREE.Vector4( 100, 100, 0, nurbsParams.weights[3][3] )
         ]
     ];
 
