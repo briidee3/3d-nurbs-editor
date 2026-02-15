@@ -82,6 +82,7 @@ export default class BasicScene {
     addObject(object) {
         this.sceneObjects.scene.add(object);
         this.objects.push(object);
+        this.dragControls.objects.push(object);
     }
 
     // Handle window resizing (modified from THREEjs FAQ @ https://threejs.org/manual/#en/faq)
@@ -271,16 +272,16 @@ export default class BasicScene {
         // Initialize drag controls
         this.dragControls = new DragControls([ ... this.objects ], this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
         this.dragControls.rotateSpeed = 0;   // Effectively disable rotation
-        this.dragControls.addEventListener('dragstart', this.onDragStart);
-        this.dragControls.addEventListener('drag', this.onDrag);
-        this.dragControls.addEventListener('dragend', this.onDragEnd);
-        this.dragControls.addEventListener('hoveron', this.onHoverOn);
-        this.dragControls.addEventListener('hoveroff', this.onHoverOff);
-        // this.dragControls.addEventListener('dragstart', this.onDragStart.bind(this));
-        // this.dragControls.addEventListener('drag', this.onDrag.bind(this));
-        // this.dragControls.addEventListener('dragend', this.onDragEnd.bind(this));
-        // this.dragControls.addEventListener('hoveron', this.onHoverOn.bind(this));
-        // this.dragControls.addEventListener('hoveroff', this.onHoverOff.bind(this));
+        // this.dragControls.addEventListener('dragstart', this.onDragStart);
+        // this.dragControls.addEventListener('drag', this.onDrag);
+        // this.dragControls.addEventListener('dragend', this.onDragEnd);
+        // this.dragControls.addEventListener('hoveron', this.onHoverOn);
+        // this.dragControls.addEventListener('hoveroff', this.onHoverOff);
+        this.dragControls.addEventListener('dragstart', this.onDragStart.bind(this));
+        this.dragControls.addEventListener('drag', this.onDrag.bind(this));
+        this.dragControls.addEventListener('dragend', this.onDragEnd.bind(this));
+        this.dragControls.addEventListener('hoveron', this.onHoverOn.bind(this));
+        this.dragControls.addEventListener('hoveroff', this.onHoverOff.bind(this));
     }
 
     onDragStart(event) {
@@ -301,7 +302,7 @@ export default class BasicScene {
         if (typeof event.object !== 'undefined') {
             // Regen NURBS mesh upon release
             if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
-                event.object.parent.handleDragEnd(event);  // send to NURBS object
+                event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
                 
                 // const curId = event.object.name.split(","); // ID contains location in ctrlPts
                 // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
@@ -349,11 +350,10 @@ export default class BasicScene {
             this.nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
 
-
             // Update NURBS geometry if necessary
             if (typeof state.object !== 'undefined') {
-                if (state.object.parent.name.contains('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
-                    event.object.parent.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                if (state.object.parent.name.includes('nurbs') || state.object.geometry.type === "SphereGeometry" && state.object.parent.geometry.type === "ParametricGeometry") {
+                    state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
                 }
             }
 
@@ -368,11 +368,10 @@ export default class BasicScene {
             this.prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
 
-
             // Update NURBS geometry if necessary
             if (typeof state.object !== 'undefined') {
-                if (state.object.parent.name === 'nurbs' || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
-                    event.object.parent.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                if (state.object.parent.name.includes('nurbs') || state.object.geometry.type === "SphereGeometry" && state.object.parent.geometry.type === "ParametricGeometry") {
+                    state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
                 }
             }
         } else {
