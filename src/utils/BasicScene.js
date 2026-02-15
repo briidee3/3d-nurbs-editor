@@ -16,12 +16,13 @@ TODO:
 import * as THREE from 'three';
 import WebGL from 'three/addons/capabilities/WebGL.js'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
-import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
-import { NURBSCurve } from 'three/addons/curves/NURBSCurve.js';
-import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
-import { NURBSVolume } from 'three/addons/curves/NURBSVolume.js';
-import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
+import { DragControls } from 'three/addons/controls/DragControls.js';
+// import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
+// import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
+// import { NURBSCurve } from 'three/addons/curves/NURBSCurve.js';
+// import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
+// import { NURBSVolume } from 'three/addons/curves/NURBSVolume.js';
+// import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -30,23 +31,57 @@ import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.j
 // ------------------------------------
 export default class BasicScene {
 
-    constructor(dimension, objects, canvas, renderer, scene, camera) {
-        this.dimension = dimension;
+    constructor({
+        dimension = 2, 
+        objects = [], 
+        canvas = document.createElement("canvas"), 
+        renderer = new THREE.WebGLRenderer({ antialias: true }), 
+        scene = new THREE.Scene(), 
+        camera, 
+        document_ = document
+    }) {
+        this.dimension = dimension || 2;
         this.objects = objects || [];
         this.sceneObjects = {
             canvas: canvas, 
             scene: scene,
-            renderer: renderer,
+            renderer: renderer || new THREE.WebGLRenderer({antialias: true, canvas}),
             camera: camera
         };
         this.sceneParams = {};
         this.viewportResizeObserver = {};
         
         // Handle if 2D or 3D
-        if (dimension === 2) 
+        if (this.dimension === 2) 
             this.initAs2D();
         else 
             this.initAs3D();
+
+        this.mouse = new THREE.Vector2(0, 0);
+
+        // For undo/redo functionality
+        this.prevStates = [];
+        this.nextStates = [];
+
+        this.ctrlKeyPressed = false;
+
+        this.document = document_ || document;
+
+        // this.document.addEventListener('click', this.onClick);
+        // // document.addEventListener('mousemove', onMouseMove);
+        // this.document.addEventListener('keydown', this.handleKeyDown);
+        // this.document.addEventListener('keyup', this.handleKeyUp);
+
+        this.document.addEventListener('click', this.onClick.bind(this));
+        // document.addEventListener('mousemove', onMouseMove);
+        this.document.addEventListener('keydown', this.handleKeyDown.bind(this));
+        this.document.addEventListener('keyup', this.handleKeyUp.bind(this));
+    }
+
+    // Add a THREE object to the scene
+    addObject(object) {
+        this.sceneObjects.scene.add(object);
+        this.objects.push(object);
     }
 
     // Handle window resizing (modified from THREEjs FAQ @ https://threejs.org/manual/#en/faq)
@@ -183,6 +218,7 @@ export default class BasicScene {
         this.sceneObjects.controls.enableRotate = false;
 
         this.setupViewportResizeObjserver();
+        this.setupDragControls();
     }
 
     setupViewportResizeObjserver() {
@@ -227,7 +263,165 @@ export default class BasicScene {
         this.viewportResizeObserver.observe(this.sceneObjects.renderer.domElement);
     }
 
+    setupDragControls() {
+        // Group to hold objects being moved
+        this.dragGroup = new THREE.Group();
+        this.sceneObjects.scene.add(this.dragGroup);
+
+        // Initialize drag controls
+        this.dragControls = new DragControls([ ... this.objects ], this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
+        this.dragControls.rotateSpeed = 0;   // Effectively disable rotation
+        this.dragControls.addEventListener('dragstart', this.onDragStart);
+        this.dragControls.addEventListener('drag', this.onDrag);
+        this.dragControls.addEventListener('dragend', this.onDragEnd);
+        this.dragControls.addEventListener('hoveron', this.onHoverOn);
+        this.dragControls.addEventListener('hoveroff', this.onHoverOff);
+        // this.dragControls.addEventListener('dragstart', this.onDragStart.bind(this));
+        // this.dragControls.addEventListener('drag', this.onDrag.bind(this));
+        // this.dragControls.addEventListener('dragend', this.onDragEnd.bind(this));
+        // this.dragControls.addEventListener('hoveron', this.onHoverOn.bind(this));
+        // this.dragControls.addEventListener('hoveroff', this.onHoverOff.bind(this));
+    }
+
+    onDragStart(event) {
+        // Change look of object when dragging
+        if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0xaaaaaa);}
+
+        if (typeof event.object !== 'undefined') {
+            const curObj = event.object;
+            this.prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
+            this.nextStates.length = 0;                                                                          // Wipe nextStates
+        }
+        console.log("Drag start!");
+    }
+    
+    onDragEnd(event) {
+        if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
+
+        if (typeof event.object !== 'undefined') {
+            // Regen NURBS mesh upon release
+            if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
+                event.object.parent.handleDragEnd(event);  // send to NURBS object
+                
+                // const curId = event.object.name.split(","); // ID contains location in ctrlPts
+                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
+                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
+                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
+
+                // // Replace the geometry
+                // updateNurbs(nurbsParams, nurbsObj);
+            }
+        }
+    }
+
+    onDrag(event) {
+        if (typeof event.object !== 'undefined') {
+            // Apply movement constraints (if any)
+            {
+                // Prevent changes to z axis position
+                event.object.position.z = this.prevStates.at(this.prevStates.length - 1).position.z;
+            }
+        }
+    }
+    
+    onHoverOn(event) {
+        console.log("TEST")
+        if (typeof event.object.material.color !== 'undefined') {
+            event.object.material.color.set(0xA0A0A0);
+        }
+    }
+    
+    onHoverOff(event) {
+        if (typeof event.object.material.color !== 'undefined') {
+            event.object.material.color.set(0xFFFFFF);
+        }
+        console.log("TEST")
+    }
+    
+    onClick(event) {
+        this.mouse.x = (event.clientX / this.sceneObjects.renderer.domElement.clientWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / this.sceneObjects.renderer.domElement.clientWidth) * 2 + 1;
+    }
+    
+    onUndo(event) {
+        if (this.prevStates.length > 0) {
+            const state = this.prevStates.pop();
+            this.nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
+            state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined') {
+                if (state.object.parent.name.contains('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
+                    event.object.parent.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                }
+            }
+
+        } else {
+            console.warn("Undo event triggered. Nothing to undo!");
+        }
+    }
+
+    onRedo(event) {
+        if (this.nextStates.length > 0) {
+            const state = this.nextStates.pop();
+            this.prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
+            state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined') {
+                if (state.object.parent.name === 'nurbs' || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
+                    event.object.parent.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                }
+            }
+        } else {
+            console.warn("Redo event triggered. Nothing to redo!");
+        }
+    }
+
+
+    handleKeyDown(event) {
+        if (event instanceof KeyboardEvent) {
+            if (event.repeat) {return;} // Prevent holding down to undo or redo
+            switch (event.key) {
+                case "z":
+                    if (event.ctrlKey) {
+                        this.onUndo(event);
+                    }
+                    break;
+                case "y":
+                    if (event.ctrlKey) {
+                        this.onRedo(event);
+                    }
+                    break;
+                default:
+            }
+            // Hold ctrl to move around parent + children together
+            if (event.ctrlKey) {
+                this.ctrlKeyPressed = true;
+            } else {
+                this.ctrlKeyPressed = false;
+            }
+        }
+    }
+    handleKeyUp(event) {
+        if (event instanceof KeyboardEvent) {
+            switch (event.key) {
+                default:
+            }
+            // Hold ctrl to move around parent + children together
+            if (event.ctrlKey) {
+                this.ctrlKeyPressed = false;
+            }
+        }
+    }
+
+
     defaultAnimateLoop() {
+        if (this.ctrlKeyPressed) {
+            this.dragControls.transformGroup = false;
+        }
         this.sceneObjects.renderer.render(this.sceneObjects.scene, this.sceneObjects.camera);
     }
 
@@ -235,11 +429,16 @@ export default class BasicScene {
         // Animate the render loop, if WebGL is available
         if (WebGL.isWebGL2Available()) {
             this.sceneObjects.renderer.setAnimationLoop(animateLoop || (() => {
+                // this.sceneObjects.renderer.render(this.sceneObjects.scene, this.sceneObjects.camera);
+                if (this.ctrlKeyPressed) {
+                    this.dragControls.transformGroup = false;
+                }
                 this.sceneObjects.renderer.render(this.sceneObjects.scene, this.sceneObjects.camera);
             }));
         } else {
             const warning = WebGL.getWebGL2ErrorMessage();
-            (doc || document).getElementById('container').appendChild(warning);
+            (doc || this.document).getElementById('container').appendChild(warning);
+            console.log(warning);
         }
     }
 
