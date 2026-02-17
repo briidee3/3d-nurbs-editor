@@ -122,4 +122,4 @@ function main() {
     sceneSetup.runRenderLoop(document, sceneSetup.defaultAnimateLoop());//document, sceneSetup.defaultAnimateLoop());//document, render());//sceneSetup.defaultAnimateLoop());
 }
 
-// main();
+main();
