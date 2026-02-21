@@ -7,8 +7,8 @@ Wrapper/manager for NURBS surface objects in THREE js
 import * as THREE from 'three';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
-import BasicScene from '../utils/BasicScene.js';
-import '../utils/SplitElements.js';
+import BasicScene from './BasicScene.js';
+// import './SplitElements.js';
 
 
 export default class SurfaceObject {
@@ -97,7 +97,7 @@ export default class SurfaceObject {
         this.map.anisotropy = 16;
         this.map.colorSpace = THREE.SRGBColorSpace;
 
-        this.nurbsMaterial = new THREE.MeshLambertMaterial( { map: this.map, side: THREE.DoubleSide } );
+        this.nurbsMaterial = new THREE.MeshLambertMaterial( { map: this.map, side: THREE.DoubleSide, opacity: 0.7, transparent: true } );
 
         // https://javascript.info/bind "losing 'this' problem"
         // var testFunc = ;
@@ -115,10 +115,12 @@ export default class SurfaceObject {
         this.nurbsObj.position.set( this.threeScene.sceneObjects.canvas.clientWidth / 2, this.threeScene.sceneObjects.canvas.clientHeight / 2, 0 );
         this.nurbsObj.scale.multiplyScalar(1);
 
-        this.ptsMaterial = new THREE.PointsMaterial({ color: 0xFFFFFF, size: sizeOfCtrlPts });
+        this.ptsMaterial = new THREE.PointsMaterial({ color: 0xFFFFFF, size: sizeOfCtrlPts, opacity: 0.6, transparent: true });
         // this.updateNurbs(this.nurbsParams);     // Update weights references in ctrlPts
 
         this.makePointsObjsFromNURBS(this.nurbsParams, this.nurbsObj);
+
+        this.updateEvent = new CustomEvent("nurbs-surface-updated", { detail: { name: this.nurbsObj.name, surfaceObj: this } })
     }
 
     getSurfacePoint(u, v, target) {
@@ -167,23 +169,30 @@ export default class SurfaceObject {
     }
 
     updateNurbs(nurbsParams) {//, nurbsObj) {
-        // Update weights
-        var curRow = 0;
-        var curCol = 0;
-        nurbsParams.weights.forEach( (row) => {
-            row.forEach((col) => {
-                nurbsParams.ctrlPts[curRow][curCol].w = nurbsParams.weights[curRow][curCol];
+        try {
+            // Update weights
+            var curRow = 0;
+            var curCol = 0;
+            nurbsParams.weights.forEach( (row) => {
+                row.forEach(() => {
+                    nurbsParams.ctrlPts[curRow][curCol].w = nurbsParams.weights[curRow][curCol];
 
-                curCol++;
+                    curCol++;
+                });
+                curRow++;
+                curCol = 0;
             });
-            curRow++;
-            curCol = 0;
-        });
 
-        this.nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
-        if (this.nurbsObj.geometry !== 'undefined') { this.nurbsObj.geometry.dispose(); }
-        this.nurbsObj.geometry = new ParametricGeometry( this.getSurfacePoint.bind(this), this.geomResolution, this.geomResolution );
-        this.nurbsObj.geometry.userData = { parentSurface: this };
+            this.nurbsSurface = new NURBSSurface( nurbsParams.degree1, nurbsParams.degree2, nurbsParams.knots1, nurbsParams.knots2, nurbsParams.ctrlPts );
+            if (this.nurbsObj.geometry !== 'undefined') { this.nurbsObj.geometry.dispose(); }
+            this.nurbsObj.geometry = new ParametricGeometry( this.getSurfacePoint.bind(this), this.geomResolution, this.geomResolution );
+            this.nurbsObj.geometry.userData = { parentSurface: this };
+
+            return true;
+        } catch (e) {
+            console.error("nurbs-editor.SurfaceObject.updateNurbs: Could not update NURBS!", String(e));
+            return false;
+        }
     }
 
     updateNurbsPoint(indices, position) {
@@ -191,7 +200,7 @@ export default class SurfaceObject {
         this.nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].y = position.y;
         this.nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].z = position.z;
 
-        this.updateNurbs(this.nurbsParams);
+        return this.updateNurbs(this.nurbsParams);
     }
 
     // Handler for dragging functionality (more of that in BasicScene.js)
@@ -202,7 +211,7 @@ export default class SurfaceObject {
         this.nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
 
         // Replace the geometry
-        this.updateNurbs(this.nurbsParams);//, this.nurbsObj);
+        return this.updateNurbs(this.nurbsParams);//, this.nurbsObj);
     }
 
 };

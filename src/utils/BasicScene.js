@@ -76,13 +76,14 @@ export default class BasicScene {
         // document.addEventListener('mousemove', onMouseMove);
         this.document.addEventListener('keydown', this.handleKeyDown.bind(this));
         this.document.addEventListener('keyup', this.handleKeyUp.bind(this));
+
+        // this.needsUpdate = false
     }
 
     // Add a THREE object to the scene
     addObject(object) {
         this.sceneObjects.scene.add(object);
         this.objects.push(object);
-        this.dragControls.objects.push(object);
     }
 
     // Handle window resizing (modified from THREEjs FAQ @ https://threejs.org/manual/#en/faq)
@@ -107,7 +108,7 @@ export default class BasicScene {
         this.sceneParams.fov = 65;                                         // Field of vision
         this.sceneParams.aspect = this.sceneObjects.canvas.clientWidth / this.sceneObjects.canvas.clientHeight;// Aspect ratio
         this.sceneParams.cullNear = 0.1;                                   // Near cull plane
-        this.sceneParams.cullFar = 10000;                                   // Far cull plane
+        this.sceneParams.cullFar = 50000;                                   // Far cull plane
 
         // Used for resizing window
         this.sceneParams.tanFov = Math.tan((Math.PI / 180) * this.sceneParams.fov / 2);
@@ -158,7 +159,7 @@ export default class BasicScene {
         this.sceneObjects.controls.cursorZoom = true;
         this.sceneObjects.controls.mouseButtons.LEFT = null;
 
-        this.setupViewportResizeObjserver();
+        // this.setupViewportResizeObjserver();
     }
 
     initAs2D() {
@@ -218,18 +219,18 @@ export default class BasicScene {
         this.sceneObjects.controls.mouseButtons.LEFT = null;
         this.sceneObjects.controls.enableRotate = false;
 
-        this.setupViewportResizeObjserver();
-        this.setupDragControls();
+        // this.setupViewportResizeObjserver();
+        // this.setupDragControls();
     }
 
-    setupViewportResizeObjserver() {
+    setupViewportResizeObserver(id) {
         // Create resize observer for viewport
         this.viewportResizeObserver = new ResizeObserver(entries => { 
             // Resize the viewport for the first element, assuming it is the viewport canvas. 
             for (let entry of entries) {
                 //console.log(entry);
                 switch (entry.target.id) {
-                    case "viewport":
+                    case "viewport" || "canvas" || "surfaceEditorCanvas" || id:
                         // Resize viewport
                         // onViewportResize(entry.target);
                         if (this.onViewportResize(this.sceneObjects.renderer)) {
@@ -277,8 +278,9 @@ export default class BasicScene {
         // this.dragControls.addEventListener('dragend', this.onDragEnd);
         // this.dragControls.addEventListener('hoveron', this.onHoverOn);
         // this.dragControls.addEventListener('hoveroff', this.onHoverOff);
+        // use bind if vue
         this.dragControls.addEventListener('dragstart', this.onDragStart.bind(this));
-        this.dragControls.addEventListener('drag', this.onDrag.bind(this));
+        this.dragControls.addEventListener('drag', this.onDragVue.bind(this));
         this.dragControls.addEventListener('dragend', this.onDragEnd.bind(this));
         this.dragControls.addEventListener('hoveron', this.onHoverOn.bind(this));
         this.dragControls.addEventListener('hoveroff', this.onHoverOff.bind(this));
@@ -293,8 +295,19 @@ export default class BasicScene {
             this.prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
             this.nextStates.length = 0;                                                                          // Wipe nextStates
         }
-        console.log("Drag start!");
     }
+
+    // onDragStartVue(event) {
+    //     // Change look of object when dragging
+    //     if (typeof event.object.target.material.emissive !== 'undefined') {event.object.target.material.emissive.set(0xaaaaaa);}
+
+    //     if (typeof event.object !== 'undefined') {
+    //         const curObj = event.object;
+    //         this.prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
+    //         this.nextStates.length = 0;                                                                          // Wipe nextStates
+    //     }
+    //     console.log("Drag start!");
+    // }
     
     onDragEnd(event) {
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
@@ -302,7 +315,14 @@ export default class BasicScene {
         if (typeof event.object !== 'undefined') {
             // Regen NURBS mesh upon release
             if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
-                event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
+                const done = event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
+
+                if (done) {
+                    this.sceneObjects.canvas.dispatchEvent(event.object.parent.geometry.userData.parentSurface.updateEvent)
+                }
+
+                // Let others know about the update
+                // this.needsUpdate = true
                 
                 // const curId = event.object.name.split(","); // ID contains location in ctrlPts
                 // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
@@ -314,6 +334,30 @@ export default class BasicScene {
             }
         }
     }
+    
+    // onDragEndVue(event) {
+    //     if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
+
+    //     if (typeof event.object !== 'undefined') {
+    //         // Regen NURBS mesh upon release
+    //         if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
+    //             console.log(event)
+    //             event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
+    // 
+    //              if (dragEnd) {
+    //                  this.sceneObjects.canvas.dispatchEvent(event.object.parent.geometry.userData.parentSurface.updateEvent)
+    //              }
+                
+    //             // const curId = event.object.name.split(","); // ID contains location in ctrlPts
+    //             // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
+    //             // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
+    //             // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
+
+    //             // // Replace the geometry
+    //             // updateNurbs(nurbsParams, nurbsObj);
+    //         }
+    //     }
+    // }
 
     onDrag(event) {
         if (typeof event.object !== 'undefined') {
@@ -324,20 +368,42 @@ export default class BasicScene {
             }
         }
     }
+
+    onDragVue(event) {
+        if (typeof event.object.target !== 'undefined') {
+            // Apply movement constraints (if any)
+            {
+                // Prevent changes to z axis position
+                event.object.target.position.z = this.prevStates.at(this.prevStates.length - 1).position.z;
+            }
+        }
+    }
     
     onHoverOn(event) {
-        console.log("TEST")
         if (typeof event.object.material.color !== 'undefined') {
             event.object.material.color.set(0xA0A0A0);
         }
     }
     
+    // onHoverOnVue(event) {
+    //     console.log("TEST")
+    //     if (typeof event.object.target.material.color !== 'undefined') {
+    //         event.object.target.material.color.set(0xA0A0A0);
+    //     }
+    // }
+    
     onHoverOff(event) {
         if (typeof event.object.material.color !== 'undefined') {
             event.object.material.color.set(0xFFFFFF);
         }
-        console.log("TEST")
     }
+    
+    // onHoverOffVue(event) {
+    //     if (typeof event.object.target.material.color !== 'undefined') {
+    //         event.object.target.material.color.set(0xFFFFFF);
+    //     }
+    //     console.log("TEST")
+    // }
     
     onClick(event) {
         this.mouse.x = (event.clientX / this.sceneObjects.renderer.domElement.clientWidth) * 2 - 1;
@@ -348,17 +414,45 @@ export default class BasicScene {
         if (this.prevStates.length > 0) {
             const state = this.prevStates.pop();
             this.nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
-            state.object.position.copy(state.position);         // Only restoring position for now
+            state.object.position.copy(state.position);
+            console.log(state)
 
             // Update NURBS geometry if necessary
             if (typeof state.object !== 'undefined') {
                 if (state.object.parent.name.includes('nurbs') || state.object.geometry.type === "SphereGeometry" && state.object.parent.geometry.type === "ParametricGeometry") {
-                    state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                    const done = state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+
+                    if (done) {
+                        this.sceneObjects.canvas.dispatchEvent(state.object.parent.geometry.userData.parentSurface.updateEvent);
+                    }
                 }
             }
 
         } else {
-            console.warn("Undo event triggered. Nothing to undo!");
+            console.warn("nurbs-editor.BasicScene.onUndo: Undo event triggered. Nothing to undo!"); 
+        }
+    }
+    
+    onUndoVue(event) {
+        if (this.prevStates.length > 0) {
+            const state = this.prevStates.pop();
+            this.nextStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
+            state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined') {
+                if (state.object.parent.name.includes('nurbs') || event.object.target.geometry.type === "SphereGeometry" && event.object.target.parent.geometry.type === "ParametricGeometry") {
+                    const done = state.object.target.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+
+                    if (done) {
+                        this.sceneObjects.canvas.dispatchEvent(state.object.parent.geometry.userData.parentSurface.updateEvent);
+                    }
+                }
+            }
+
+        } else {
+            console.warn("nurbs-editor.BasicScene.onUndoVue: Undo event triggered. Nothing to undo!"); 
         }
     }
 
@@ -368,14 +462,41 @@ export default class BasicScene {
             this.prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
             state.object.position.copy(state.position);         // Only restoring position for now
 
+
             // Update NURBS geometry if necessary
             if (typeof state.object !== 'undefined') {
-                if (state.object.parent.name.includes('nurbs') || state.object.geometry.type === "SphereGeometry" && state.object.parent.geometry.type === "ParametricGeometry") {
-                    state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+                if (state.object.parent.name === 'nurbs' || state.object.geometry.type === "SphereGeometry" && state.object.parent.geometry.type === "ParametricGeometry") {
+                    const done = state.object.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+
+                    if (done) {
+                        this.sceneObjects.canvas.dispatchEvent(state.object.parent.geometry.userData.parentSurface.updateEvent)
+                    }
                 }
             }
         } else {
-            console.warn("Redo event triggered. Nothing to redo!");
+            console.warn("nurbs-editor.BasicScene.onRedo: Redo event triggered. Nothing to redo!");
+        }
+    }
+
+    onRedoVue(event) {
+        if (this.nextStates.length > 0) {
+            const state = this.nextStates.pop();
+            this.prevStates.push({ object: state.object, position: JSON.parse(JSON.stringify(state.object.position))}); // Add current position to redo stack
+            state.object.position.copy(state.position);         // Only restoring position for now
+
+
+            // Update NURBS geometry if necessary
+            if (typeof state.object !== 'undefined') {
+                if (state.object.parent.name === 'nurbs' || event.object.target.geometry.type === "SphereGeometry" && event.object.target.parent.geometry.type === "ParametricGeometry") {
+                    const done = state.object.target.parent.geometry.userData.parentSurface.updateNurbsPoint(state.object.name.split(","), state.object.position);
+
+                    if (done) {
+                        this.sceneObjects.canvas.dispatchEvent(state.object.parent.geometry.userData.parentSurface.updateEvent)
+                    }
+                }
+            }
+        } else {
+            console.warn("nurbs-editor.BasicScene.onRedoVue: Redo event triggered. Nothing to redo!");
         }
     }
 
@@ -392,6 +513,30 @@ export default class BasicScene {
                 case "y":
                     if (event.ctrlKey) {
                         this.onRedo(event);
+                    }
+                    break;
+                default:
+            }
+            // Hold ctrl to move around parent + children together
+            if (event.ctrlKey) {
+                this.ctrlKeyPressed = true;
+            } else {
+                this.ctrlKeyPressed = false;
+            }
+        }
+    }
+    handleKeyDownVue(event) {
+        if (event instanceof KeyboardEvent) {
+            if (event.repeat) {return;} // Prevent holding down to undo or redo
+            switch (event.key) {
+                case "z":
+                    if (event.ctrlKey) {
+                        this.onUndoVue(event);
+                    }
+                    break;
+                case "y":
+                    if (event.ctrlKey) {
+                        this.onRedoVue(event);
                     }
                     break;
                 default:
@@ -437,7 +582,7 @@ export default class BasicScene {
         } else {
             const warning = WebGL.getWebGL2ErrorMessage();
             (doc || this.document).getElementById('container').appendChild(warning);
-            console.log(warning);
+            console.warn(warning);
         }
     }
 
