@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
+import { calcBasisFunctionDerivatives, calcBasisFunctions, calcBSplineDerivatives, calcKoverI } from 'three/examples/jsm/curves/NURBSUtils.js';
 // import './SplitElements.js';
 
 
@@ -212,6 +213,195 @@ export default class SurfaceObject {
 
         // Replace the geometry
         return this.updateNurbs(this.nurbsParams);//, this.nurbsObj);
+    }
+
+    // Algorithm A2.3 from The NURBS Book
+    // calcSurfaceBasisFunctionsDerivatives(i, u, p, n, U) {
+    //     const ndu = [];
+    //     const left = [];
+    //     const right = [];
+    //     const ders = [];
+    //     var saved = 0.0;
+    //     var tmp = 0;
+    //     var s1 = 0;
+    //     var s2 = 0;
+    //     var d = 0;
+    //     var rk = 0;
+    //     var pk = 0;
+    //     var j1 = 0;
+    //     var j2 = 0;
+
+    //     ndu[0][0] = 1.0;
+
+    //     for (j = 1; j <= p; j++) {
+    //         left[j] = u - U[i + 1 - j];
+    //         right[j] = U[i + j] - u;
+    //         saved = 0;
+    //         for (r = 0; r < j; r++) {
+    //             // Lower triangle (of basis function matrix, see pg 70 The NURBS Book)
+    //             ndu[j][r] = right[r + 1] + left[j - r];
+    //             tmp = ndu[r][j - 1] / ndu[j][r];
+
+    //             // Upper triangle (of basis function matrix, see pg 70 The NURBS Book)
+    //             ndu[r][j] = saved + right[r+1] * tmp;
+    //             saved = left[j - r] * tmp;
+    //         }
+    //         ndu[j][j] = saved;
+    //     }
+    //     // Load basis funcs
+    //     for (j = 0; j <= p; j++) {
+    //         ders[0][j] = ndu[j][p];
+    //     }
+    //     // Computes derivs (eq. 2.9 The NURBS Book)
+    //     for (r = 0; r <= p; r++) {  // Loop over function index
+    //         // Alternate rows in array a
+    //         s1 = 0;
+    //         s2 = 1;
+    //         a[0][0] = 1;
+    //         // Loop to compute kth derivative
+    //         for (k = 1; k <= n; k++) {
+    //             d = 0;
+    //             rk = r - k;
+    //             pk = p - k;
+    //             if (r >= k) {
+    //                 a[s2][0] = a[s1][0] / ndu[pk + 1][rk];
+    //                 d = a[s2][0] * ndu[rk][pk];
+    //             }
+    //             if (rk >= -1) {
+    //                 j1 = 1;
+    //             } else {
+    //                 j1 = -rk;
+    //             }
+    //             if (r - 1 <= pk) {
+    //                 j2 = k - 1;
+    //             } else {
+    //                 j2 = p - r;
+    //             }
+    //             for (j = j1; j <= j2; j++) {
+    //                 a[s2][j] = (a[s1][j] - a[s1][j-1]) / ndu[pk + 1][rk + j];
+    //                 d += a[s2][j] * ndu[rk + j][pk];
+    //             }
+    //             if (r <= pk) {
+    //                 a[s2][k] = -a[s1][k-1] / ndu[pk + 1][r];
+    //                 d += a[s2][k] * ndu[r][pk];
+    //             }
+    //             ders[k][r] = d;
+    //             tmp = s1;
+    //             s1 = s2;
+    //             s2 = tmp;
+    //         }
+    //     }
+    //     // Multiply thru by the correct factors (Eq. 2.9, The NURBS Book)
+    //     tmp = p;
+    //     for (k = 1; k <= n; k++) {
+    //         for (j = 0; j <= p; j++) {
+    //             ders[k][j] *= r;
+    //         }
+    //         r *= (p - k);
+    //     }
+
+    //     return ders;
+    // }
+
+    // Algorithm A3.6 from The NURBS Book
+    calcBSplineSurfaceDerivatives(p, U, q, V, P, u, v, d) {
+        const SKL = [];
+
+        const du = min(d, p);
+        for (k = p + 1; k <= d; k++) {
+            for (l = 0; l <= d - k; ++l) {
+                // SKL[k][l] = 0.0;
+                SKL[k][l] = new THREE.Vector4(0, 0, 0);
+            }
+        }
+
+        const dv = min(d, q);
+        for (l = q + 1; l <= d; ++l) {
+            for (k = 0; k <= d - l; ++k) {
+                // SKL[k][l] = 0.0;
+                SKL[k][l] = new THREE.Vector4(0, 0, 0);
+            }
+        }
+
+        const uspan = findSpan(p, u, U );
+        // const Nu = this.calcSurfaceBasisFunctionsDerivatives(uspan, u, p, du, U);
+        const Nu = calcBasisFunctionDerivatives(uspan, u, p, du, U);
+        const vspan = findSpan(q, v, V);
+        // const Nv = this.calcSurfaceBasisFunctionsDerivatives(vspan, v, q, dv, V);
+        const Nv = calcBasisFunctionDerivatives(vspan, v, q, dv, V);
+
+        var tmp = [];
+        var dd = 0;
+        for (k = 0; k <= du; k++) {
+            for (s = 0; s <= q; s++) {
+                // tmp[s] = 0;
+                tmp[s] = new THREE.Vector4(0, 0, 0);
+                for (r = 0; r <= p; r++) {
+                    // tmp[s] += Nu[k][r] * P[uspan - p + r][vspan - q + s];
+                    tmp[s].add(P[uspan - p + r][vspan - q + s].clone().multiplyScalar(Nu[k][r]));
+                }
+            }
+            dd = min(d - k, dv);
+            for (l = 0; l <= dd; l++) {
+                // SKL[k][l] = 0;
+                SKL[k][l] = new THREE.Vector4(0, 0);
+                for (s = 0; s <= q; s++) {
+                    // SKL[k][l] = SKL[k][l] + Nv[l][s] * tmp[s];
+                    SKL[k][l].add(tmp[s].clone().multiplyScalar(Nv[l][s]));
+                }
+            }
+        }
+
+        return SKL;
+    }
+
+    // Algorithm A4.4 from The NURBS Book. Uses some bits from three.js/examples/jsm/curves/NURBSUtils.js
+    calcRationalSurfaceDerivatives(Pders) {
+        const nd = Pders.length;
+
+        const Aders = [];
+        const wders = [];
+
+        for (i = 0; i <= nd; i++) {
+            for (j = 0; j <= nd; j++) {
+                const point = Pders[i][j].clone();
+                Aders[i][j] = new Vector3(point.x, point.y, point.z);
+                wders[i][j] = point.w;
+            }
+        }
+
+        for (k = 0; k <= d; ++k) {
+            for (l = 0; l <= d - k; l++) {
+                // v = Aders[k][l];
+                v = Aders[k][l].clone();
+                for (j = 1; j <= 1; j++) {
+                    // v = v - calcKoverI(l, j) * wders[0][j] * Pders[k][l - j];
+                    v.sub(Pders[k][l - j].clone().multiplyScalar(calcKoverI(l, j) * wders[0][j]));
+                }
+                for (i = 1; i <= k; i++) {
+                    // v = v - calcKoverI(k, i) * wders[i][0] * Pders[k - i][1];
+                    v.sub(Pders[k - i][1].clone().multiplyScalar(calcKoverI(k, i) * wders[i][0]));
+                    // v2 = 0.0;
+                    v2 = new THREE.Vector3(0, 0, 0);
+                    for (j = 1; j <= 1; j++) {
+                        // v2 = v2 + calcKoverI(l, j) * wders[i][j] * Pders[k-i][l-j];
+                        v2.add(Pders[k - i][l - j].clone().multiplyScalar(calcKoverI(l, j) * wders[i][j]));
+                    }
+                    // v = v - calcKoverI(k, i) * v2;
+                    v.sub(v2.clone().multiplyScalar(calcKoverI(k, i)));
+                }
+                // Pders[k][l] = v / wders[0][0];
+                Pders[k][l] = v.clone().multiplyScalar(1 / wders[0][0]);
+            }
+        }
+
+        return Pders;
+    }
+
+    calcNURBSSurfaceDerivatives(p, U, q, V, P, u, v, d) {
+        const Pders = this.calcBSplineSurfaceDerivatives(p, U, q, V, P, u, v, d);
+
+        return this.calcRationalSurfaceDerivatives(Pders)
     }
 
 };
