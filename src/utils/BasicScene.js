@@ -313,7 +313,7 @@ export default class BasicScene {
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
 
         if (typeof event.object !== 'undefined') {
-            // Regen NURBS mesh upon release
+            // Regen NURBS mesh upon release if is ctrl pts of nurbs
             if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
                 const done = event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
 
@@ -407,7 +407,7 @@ export default class BasicScene {
     
     onClick(event) {
         this.mouse.x = (event.clientX / this.sceneObjects.renderer.domElement.clientWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / this.sceneObjects.renderer.domElement.clientWidth) * 2 + 1;
+        this.mouse.y = -(event.clientY / this.sceneObjects.renderer.domElement.clientHeight) * 2 + 1;
     }
     
     onUndo(event) {
