@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
-import { calcBasisFunctionDerivatives, calcBasisFunctions, calcBSplineDerivatives, calcKoverI } from 'three/examples/jsm/curves/NURBSUtils.js';
+import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcNURBSDerivatives } from 'three/examples/jsm/curves/NURBSUtils.js';
 // import './SplitElements.js';
 
 
@@ -16,15 +16,17 @@ export default class SurfaceObject {
 
     constructor({
         nurbsParams = {
-            degree1: 3,
-            degree2: 3,
-            knots1: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
-            knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
+            degree1: 4,
+            degree2: 4,
+            knots1: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
+            knots2: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
             weights: [
-                [ 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1 ]
+                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1, 1 ],
             ],
             // ctrlPts: [
             //     [
@@ -54,29 +56,40 @@ export default class SurfaceObject {
             // ]
             ctrlPts: [
                 [
-                    new THREE.Vector4( - 200, - 200, 0, 1 ),
-                    new THREE.Vector4( - 200, - 100, 0, 1 ),
-                    new THREE.Vector4( - 200, 0, 0, 1 ),
-                    new THREE.Vector4( - 200, 100, 0, 1 )
-                ],
-                [
-                    new THREE.Vector4( -100, - 200, 0, 1 ),
-                    new THREE.Vector4( -100, - 100, 0, 1 ),
-                    new THREE.Vector4( -100, 0, 0, 1 ),
-                    new THREE.Vector4( -100, 100, 0, 1 )
-                ],
-                [
-                    new THREE.Vector4( 0, - 200, 0, 1 ),
-                    new THREE.Vector4( 0, - 100, 0, 1 ),
                     new THREE.Vector4( 0, 0, 0, 1 ),
-                    new THREE.Vector4( 0, 100, 0, 1 )
+                    new THREE.Vector4( 0, 100, 0, 1 ),
+                    new THREE.Vector4( 0, 200, 0, 1 ),
+                    new THREE.Vector4( 0, 300, 0, 1 ),
+                    new THREE.Vector4( 0, 400, 0, 1 ),
                 ],
                 [
-                    new THREE.Vector4( 100, - 200, 0, 1 ),
-                    new THREE.Vector4( 100, - 100, 0, 1 ),
                     new THREE.Vector4( 100, 0, 0, 1 ),
-                    new THREE.Vector4( 100, 100, 0, 1 )
-                ]
+                    new THREE.Vector4( 100, 100, 0, 1 ),
+                    new THREE.Vector4( 100, 200, 0, 1 ),
+                    new THREE.Vector4( 100, 300, 0, 1 ),
+                    new THREE.Vector4( 100, 400, 0, 1 ),
+                ],
+                [
+                    new THREE.Vector4( 200, 0, 0, 1 ),
+                    new THREE.Vector4( 200, 100, 0, 1 ),
+                    new THREE.Vector4( 200, 200, 0, 1 ),
+                    new THREE.Vector4( 200, 300, 0, 1 ),
+                    new THREE.Vector4( 200, 400, 0, 1 ),
+                ],
+                [
+                    new THREE.Vector4( 300, 0, 0, 1 ),
+                    new THREE.Vector4( 300, 100, 0, 1 ),
+                    new THREE.Vector4( 300, 200, 0, 1 ),
+                    new THREE.Vector4( 300, 300, 0, 1 ),
+                    new THREE.Vector4( 300, 400, 0, 1 ),
+                ],
+                [
+                    new THREE.Vector4( 400, 0, 0, 1 ),
+                    new THREE.Vector4( 400, 100, 0, 1 ),
+                    new THREE.Vector4( 400, 200, 0, 1 ),
+                    new THREE.Vector4( 400, 300, 0, 1 ),
+                    new THREE.Vector4( 400, 400, 0, 1 ),
+                ],
             ]
         },
         texturePath = '../img/uv_grid_opengl.jpg',
@@ -90,6 +103,11 @@ export default class SurfaceObject {
         this.sizeOfCtrlPts = sizeOfCtrlPts;
         this.threeScene = threeScene;
         this.nurbsParams = nurbsParams;
+
+        // console.log(calcNURBSDerivatives(this.nurbsParams.degree1, this.nurbsParams.knots1, this.nurbsParams.ctrlPts[0], 0, 1));
+        // console.log(calcNURBSDerivatives(this.nurbsParams.degree1, this.nurbsParams.knots1, this.nurbsParams.ctrlPts[0], 0.5, 1));
+        // console.log(calcNURBSDerivatives(this.nurbsParams.degree1, this.nurbsParams.knots1, this.nurbsParams.ctrlPts[0], 0.666666, 1));
+        // console.log(calcNURBSDerivatives(this.nurbsParams.degree1, this.nurbsParams.knots1, this.nurbsParams.ctrlPts[0], 1, 1));
 
         this.nurbsSurface = new NURBSSurface( this.nurbsParams.degree1, this.nurbsParams.degree2, this.nurbsParams.knots1, this.nurbsParams.knots2, this.nurbsParams.ctrlPts );
 
@@ -233,11 +251,11 @@ export default class SurfaceObject {
 
     //     ndu[0][0] = 1.0;
 
-    //     for (j = 1; j <= p; j++) {
+    //     for (var j = 1; j <= p; j++) {
     //         left[j] = u - U[i + 1 - j];
     //         right[j] = U[i + j] - u;
     //         saved = 0;
-    //         for (r = 0; r < j; r++) {
+    //         for (var r = 0; r < j; r++) {
     //             // Lower triangle (of basis function matrix, see pg 70 The NURBS Book)
     //             ndu[j][r] = right[r + 1] + left[j - r];
     //             tmp = ndu[r][j - 1] / ndu[j][r];
@@ -249,17 +267,17 @@ export default class SurfaceObject {
     //         ndu[j][j] = saved;
     //     }
     //     // Load basis funcs
-    //     for (j = 0; j <= p; j++) {
+    //     for (var j = 0; j <= p; j++) {
     //         ders[0][j] = ndu[j][p];
     //     }
     //     // Computes derivs (eq. 2.9 The NURBS Book)
-    //     for (r = 0; r <= p; r++) {  // Loop over function index
+    //     for (var r = 0; r <= p; r++) {  // Loop over function index
     //         // Alternate rows in array a
     //         s1 = 0;
     //         s2 = 1;
     //         a[0][0] = 1;
     //         // Loop to compute kth derivative
-    //         for (k = 1; k <= n; k++) {
+    //         for (var k = 1; k <= n; k++) {
     //             d = 0;
     //             rk = r - k;
     //             pk = p - k;
@@ -277,7 +295,7 @@ export default class SurfaceObject {
     //             } else {
     //                 j2 = p - r;
     //             }
-    //             for (j = j1; j <= j2; j++) {
+    //             for (var j = j1; j <= j2; j++) {
     //                 a[s2][j] = (a[s1][j] - a[s1][j-1]) / ndu[pk + 1][rk + j];
     //                 d += a[s2][j] * ndu[rk + j][pk];
     //             }
@@ -293,8 +311,8 @@ export default class SurfaceObject {
     //     }
     //     // Multiply thru by the correct factors (Eq. 2.9, The NURBS Book)
     //     tmp = p;
-    //     for (k = 1; k <= n; k++) {
-    //         for (j = 0; j <= p; j++) {
+    //     for (var k = 1; k <= n; k++) {
+    //         for (var j = 0; j <= p; j++) {
     //             ders[k][j] *= r;
     //         }
     //         r *= (p - k);
@@ -306,46 +324,53 @@ export default class SurfaceObject {
     // Algorithm A3.6 from The NURBS Book
     calcBSplineSurfaceDerivatives(p, U, q, V, P, u, v, d) {
         const SKL = [];
+        // for (var i = 0; i <= p + 1; i++) {
+        //     for (var j = 0; j <= q + 1; j++) {
+        //         SKL[i] = [];
+        //         SKL[i][j] = null;
+        //     }
+        // }
 
-        const du = min(d, p);
-        for (k = p + 1; k <= d; k++) {
-            for (l = 0; l <= d - k; ++l) {
+        const du = Math.min(d, p);
+        for (var k = p + 1; k <= d; k++) {
+            SKL[k] = [];
+            for (var l = 0; l <= d - k; l++) {
                 // SKL[k][l] = 0.0;
-                SKL[k][l] = new THREE.Vector4(0, 0, 0);
+                SKL[k][l] = new THREE.Vector4();
             }
         }
 
-        const dv = min(d, q);
-        for (l = q + 1; l <= d; ++l) {
-            for (k = 0; k <= d - l; ++k) {
+        const dv = Math.min(d, q);
+        for (var l = q + 1; l <= d; l++) {
+            for (var k = 0; k <= d - l; k++) {
                 // SKL[k][l] = 0.0;
-                SKL[k][l] = new THREE.Vector4(0, 0, 0);
+                SKL[k] = [];
+                SKL[k][l] = new THREE.Vector4();
             }
         }
-
-        const uspan = findSpan(p, u, U );
-        // const Nu = this.calcSurfaceBasisFunctionsDerivatives(uspan, u, p, du, U);
+        
+        const uspan = findSpan(p, u, U);
         const Nu = calcBasisFunctionDerivatives(uspan, u, p, du, U);
         const vspan = findSpan(q, v, V);
-        // const Nv = this.calcSurfaceBasisFunctionsDerivatives(vspan, v, q, dv, V);
         const Nv = calcBasisFunctionDerivatives(vspan, v, q, dv, V);
 
         var tmp = [];
         var dd = 0;
-        for (k = 0; k <= du; k++) {
-            for (s = 0; s <= q; s++) {
+        for (var k = 0; k <= du; k++) {
+            if (typeof SKL[k] === 'undefined') { SKL[k] = []; }
+            for (var s = 0; s <= q; s++) {
                 // tmp[s] = 0;
-                tmp[s] = new THREE.Vector4(0, 0, 0);
-                for (r = 0; r <= p; r++) {
+                tmp[s] = new THREE.Vector4();
+                for (var r = 0; r <= p; r++) {
                     // tmp[s] += Nu[k][r] * P[uspan - p + r][vspan - q + s];
                     tmp[s].add(P[uspan - p + r][vspan - q + s].clone().multiplyScalar(Nu[k][r]));
                 }
             }
-            dd = min(d - k, dv);
-            for (l = 0; l <= dd; l++) {
+            dd = Math.min(d - k, dv);
+            for (var l = 0; l <= dd; l++) {
                 // SKL[k][l] = 0;
-                SKL[k][l] = new THREE.Vector4(0, 0);
-                for (s = 0; s <= q; s++) {
+                SKL[k][l] = new THREE.Vector4();
+                for (var s = 0; s <= q; s++) {
                     // SKL[k][l] = SKL[k][l] + Nv[l][s] * tmp[s];
                     SKL[k][l].add(tmp[s].clone().multiplyScalar(Nv[l][s]));
                 }
@@ -357,33 +382,43 @@ export default class SurfaceObject {
 
     // Algorithm A4.4 from The NURBS Book. Uses some bits from three.js/examples/jsm/curves/NURBSUtils.js
     calcRationalSurfaceDerivatives(Pders) {
-        const nd = Pders.length;
+        const nd = Pders.length - 1;
+        var v = null;
+        var v2 = null;
 
         const Aders = [];
         const wders = [];
 
-        for (i = 0; i <= nd; i++) {
-            for (j = 0; j <= nd; j++) {
-                const point = Pders[i][j].clone();
-                Aders[i][j] = new Vector3(point.x, point.y, point.z);
-                wders[i][j] = point.w;
-            }
-        }
+        // for (var i = 0; i < nd; i++) {
+        //     Aders[i] = [];
+        //     wders[i] = [];
+        //     for (var j = 0; j < nd - i; j++) {
+        //         const point = Pders[i][j];
+        //         Aders[i][j] = new THREE.Vector3(point.x, point.y, point.z);
+        //         wders[i][j] = point.w;
+        //     }
+        // }
 
-        for (k = 0; k <= d; ++k) {
-            for (l = 0; l <= d - k; l++) {
+        for (var k = 0; k <= nd; k++) {
+            Aders[k] = [];
+            wders[k] = [];
+            for (var l = 0; l <= nd - k; l++) {
+                const point = Pders[k][l];
+                Aders[k][l] = new THREE.Vector3(point.x, point.y, point.z);
+                wders[k][l] = point.w;
+
                 // v = Aders[k][l];
                 v = Aders[k][l].clone();
-                for (j = 1; j <= 1; j++) {
+                for (var j = 1; j <= l; j++) {
                     // v = v - calcKoverI(l, j) * wders[0][j] * Pders[k][l - j];
                     v.sub(Pders[k][l - j].clone().multiplyScalar(calcKoverI(l, j) * wders[0][j]));
                 }
-                for (i = 1; i <= k; i++) {
+                for (var i = 1; i <= k; i++) {
                     // v = v - calcKoverI(k, i) * wders[i][0] * Pders[k - i][1];
-                    v.sub(Pders[k - i][1].clone().multiplyScalar(calcKoverI(k, i) * wders[i][0]));
+                    v.sub(Pders[k - i][l].clone().multiplyScalar(calcKoverI(k, i) * wders[i][0]));
                     // v2 = 0.0;
                     v2 = new THREE.Vector3(0, 0, 0);
-                    for (j = 1; j <= 1; j++) {
+                    for (var j = 1; j <= l; j++) {
                         // v2 = v2 + calcKoverI(l, j) * wders[i][j] * Pders[k-i][l-j];
                         v2.add(Pders[k - i][l - j].clone().multiplyScalar(calcKoverI(l, j) * wders[i][j]));
                     }
@@ -398,10 +433,127 @@ export default class SurfaceObject {
         return Pders;
     }
 
-    calcNURBSSurfaceDerivatives(p, U, q, V, P, u, v, d) {
-        const Pders = this.calcBSplineSurfaceDerivatives(p, U, q, V, P, u, v, d);
+    // calcNURBSSurfaceDerivatives(p, U, q, V, P, u, v, d) {
+    calcNURBSSurfaceDerivatives(u, v, d) {
+        // const Pders = this.calcBSplineSurfaceDerivatives(p, U, q, V, P, u, v, d);
+        const Pders = this.calcBSplineSurfaceDerivatives(
+            this.nurbsParams.degree1,
+            this.nurbsParams.knots1,
+            this.nurbsParams.degree2,
+            this.nurbsParams.knots2,
+            this.nurbsParams.ctrlPts, 
+            u, v, d
+        );
+        console.log(Pders);
 
-        return this.calcRationalSurfaceDerivatives(Pders)
+        return this.calcRationalSurfaceDerivatives(Pders);
     }
 
+    // Modified version of algorithm 2 from https://arxiv.org/pdf/2210.13160
+    calcNearestSurfacePointFromPoint(dn, tol, maxIt, p, damp) {
+        // const uDampInit = 0.5;    // Initialize dampers to uMax and vMax
+        // const vDampInit = 0.5;
+        // const fixedDecimal = 10;
+
+        var damp = damp || 0.7;
+        var dampCur = 1;
+        var uCur = 0;
+        var du = 0;
+        var vCur = 0;
+        var dv = 0;
+        const pCur = new THREE.Vector3();
+        var uHatCur = new THREE.Vector3();
+        var uHatLen = 0;
+        var vHatCur = new THREE.Vector3();
+        var vHatLen = 0;
+
+        this.getSurfacePoint(uCur, vCur, pCur);
+        var rVecCur = p.clone();
+        rVecCur.sub(pCur.clone());
+        var rCur = pCur.distanceTo(p);
+        // var rVecUnitVec = rVecCur.multiplyScalar(1 / rCur);
+
+        var uCurPrev = uCur;
+        var vCurPrev = vCur;
+        var uCheck = false;
+        var vCheck = false;
+
+        // Iteratively move towards the nearest point
+        for (var i = 0; i < maxIt + 1; i++) {
+            // Get u and v unit vectors
+            this.getSurfacePoint(uCur + dn, vCur, uHatCur);
+            uHatCur.sub(pCur.clone());
+            du = uHatCur.normalize().dot(rVecCur.normalize().multiplyScalar(2 / Math.sqrt(2)));//Math.sqrt(2) / 2));// / (rCur);
+            this.getSurfacePoint(uCur, vCur + dn, vHatCur);
+            vHatCur.sub(pCur.clone());
+            dv = vHatCur.normalize().dot(rVecCur.normalize().multiplyScalar(2 / Math.sqrt(2)));// / (rCur);
+            // Multiplying by 2/sqrt(2) here so that 1,1 can be reached. otherwise the limit when u=v is sqrt(2)/2, sqrt(2) / 2
+            
+            uCur += dampCur * du;
+            vCur += dampCur * dv;
+
+            if (uCur > 1 || uCur < 0) { uCheck = true; } else { uCheck = false; }
+            if (vCur > 1 || vCur < 0) { vCheck = true; } else { vCheck = false; }
+
+            // Break if going back and forth or if latest difference less than tol
+            // if (Math.abs(uCur - uCurPrev) < tol && Math.abs(vCur - vCurPrev) < tol || (uCheck && vCheck)) {
+            // if ((uCur === uCurPrev && vCur === vCurPrev) || (uCheck && vCheck)) {
+            //     break;
+            // } else {
+            //     uCurPrev = uCur - dampCur * du;
+            //     vCurPrev = vCur - dampCur * dv;
+            // }
+
+            // Update vector pointing from point at S(uCur, vCur) to point p
+            this.getSurfacePoint(uCur, vCur, pCur);
+            rVecCur = p.clone();
+            rVecCur.sub(pCur.clone());
+            rCur = pCur.distanceTo(p);
+
+            if (rCur < tol) {
+                break;
+            }
+
+            dampCur = Math.max(dn, dampCur * damp);    // Essentially doing a binary search
+        }
+
+        if (uCur > 1) {
+            uCur = 1;
+        } else if (uCur < 0) {
+            uCur = 0;
+        }
+
+        if (vCur > 1) {
+            vCur = 1;
+        } else if (vCur < 0) {
+            vCur = 0;
+        }
+
+        return [ uCur, vCur, rCur ];
+    }
+
+    // Get surface derivatives given xyz point in world coordinates. Tol must be > minDistForUnitVectors.
+    calcNURBSSurfaceDerivativesXYZ(point, d) {
+        // Offset p by the nurbsObj's position
+        const p = point.clone();
+        p.sub(this.nurbsObj.position);
+        console.log(p);
+
+        const tol = 0.000001;
+        const minDistForUnitVectors = tol / 2;
+        const maxIterations = 60;
+        const uvCoords = this.calcNearestSurfacePointFromPoint(minDistForUnitVectors, tol, maxIterations, p, 0.5 );
+
+        console.log(uvCoords);
+        const test = new THREE.Vector3();
+        this.getSurfacePoint(uvCoords[0], uvCoords[1], test);
+        console.log(test);
+
+        return this.calcNURBSSurfaceDerivatives(uvCoords[0], uvCoords[1], d);
+    }
+
+    // Check if another THREE object is colliding with the mesh of the surface object
+    isColliding() {
+
+    }
 };

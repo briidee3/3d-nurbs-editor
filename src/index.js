@@ -59,35 +59,65 @@ const defaultNurbsParams = {
     knots1: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
     knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
     weights: [
-        [ 1, 1, 1, 1 ],
-        [ 1, 1, 1, 1 ],
-        [ 1, 1, 1, 1 ],
-        [ 1, 1, 1, 1 ]
+        [ 1, 1, 1, 1, 1 ],
+        [ 1, 1, 1, 1, 1 ],
+        [ 1, 1, 1, 1, 1 ],
+        [ 1, 1, 1, 1, 1 ],
     ],
+    // ctrlPts: [
+    //     [
+    //         new THREE.Vector4( - 200, - 200, 0, 1 ),
+    //         new THREE.Vector4( - 200, - 100, 0, 1 ),
+    //         new THREE.Vector4( - 200, 0, 0, 1 ),
+    //         new THREE.Vector4( - 200, 100, 0, 1 )
+    //     ],
+    //     [
+    //         new THREE.Vector4( -100, - 200, 0, 1 ),
+    //         new THREE.Vector4( -100, - 100, 0, 1 ),
+    //         new THREE.Vector4( -100, 0, 0, 1 ),
+    //         new THREE.Vector4( -100, 100, 0, 1 )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 0, - 200, 0, 1 ),
+    //         new THREE.Vector4( 0, - 100, 0, 1 ),
+    //         new THREE.Vector4( 0, 0, 0, 1 ),
+    //         new THREE.Vector4( 0, 100, 0, 1 )
+    //     ],
+    //     [
+    //         new THREE.Vector4( 100, - 200, 0, 1 ),
+    //         new THREE.Vector4( 100, - 100, 0, 1 ),
+    //         new THREE.Vector4( 100, 0, 0, 1 ),
+    //         new THREE.Vector4( 100, 100, 0, 1 )
+    //     ]
+    // ][
     ctrlPts: [
         [
-            new THREE.Vector4( - 200, - 200, 0, 1 ),
-            new THREE.Vector4( - 200, - 100, 0, 1 ),
-            new THREE.Vector4( - 200, 0, 0, 1 ),
-            new THREE.Vector4( - 200, 100, 0, 1 )
-        ],
-        [
-            new THREE.Vector4( -100, - 200, 0, 1 ),
-            new THREE.Vector4( -100, - 100, 0, 1 ),
-            new THREE.Vector4( -100, 0, 0, 1 ),
-            new THREE.Vector4( -100, 100, 0, 1 )
-        ],
-        [
-            new THREE.Vector4( 0, - 200, 0, 1 ),
-            new THREE.Vector4( 0, - 100, 0, 1 ),
             new THREE.Vector4( 0, 0, 0, 1 ),
-            new THREE.Vector4( 0, 100, 0, 1 )
+            new THREE.Vector4( 0, 100, 0, 1 ),
+            new THREE.Vector4( 0, 200, 0, 1 ),
+            new THREE.Vector4( 0, 300, 0, 1 ),
+            new THREE.Vector4( 0, 400, 0, 1 ),
         ],
         [
-            new THREE.Vector4( 100, - 200, 0, 1 ),
-            new THREE.Vector4( 100, - 100, 0, 1 ),
             new THREE.Vector4( 100, 0, 0, 1 ),
-            new THREE.Vector4( 100, 100, 0, 1 )
+            new THREE.Vector4( 100, 100, 0, 1 ),
+            new THREE.Vector4( 100, 200, 0, 1 ),
+            new THREE.Vector4( 100, 300, 0, 1 ),
+            new THREE.Vector4( 100, 400, 0, 1 )
+        ],
+        [
+            new THREE.Vector4( 200, 0, 0, 1 ),
+            new THREE.Vector4( 200, 100, 0, 1 ),
+            new THREE.Vector4( 200, 200, 0, 1 ),
+            new THREE.Vector4( 200, 300, 0, 1 ),
+            new THREE.Vector4( 200, 400, 0, 1 )
+        ],
+        [
+            new THREE.Vector4( 300, 0, 0, 1 ),
+            new THREE.Vector4( 300, 100, 0, 1 ),
+            new THREE.Vector4( 300, 200, 0, 1 ),
+            new THREE.Vector4( 300, 300, 0, 1 ),
+            new THREE.Vector4( 300, 400, 0, 1 )
         ]
     ]
 }
@@ -109,7 +139,7 @@ function main() {
 
 
     // Scene setup
-    sceneSetup.sceneObjects.camera.position.z = 1000;
+    sceneSetup.sceneObjects.camera.position.z = 1;
     // sceneSetup.setupDragControls();
 
 
@@ -242,8 +272,8 @@ function main() {
     const grid = new THREE.GridHelper(10000, 250);
     grid.rotation.x = Math.PI * 0.5;
     grid.position.z = -1.1;
-    // sceneSetup.sceneObjects.scene.add(grid);
-    sceneSetup.addObject(grid);
+    sceneSetup.sceneObjects.scene.add(grid);
+    // sceneSetup.addObject(grid);
 
 
     // Handle mouse movement (ref: https://sbcode.net/threejs/mousepick/)
@@ -465,10 +495,55 @@ function main() {
 
     // document.addEventListener('click', onClick);
     // // document.addEventListener('mousemove', onMouseMove);
-    // document.addEventListener('keydown', handleKeyDown);
+
+    function testSurfaceDerivs(mousePos) {
+        // Getting mouse position in THREE world space (https://stackoverflow.com/questions/13055214/mouse-canvas-x-y-to-three-js-world-x-y-z)
+        const vec = new THREE.Vector3(mousePos.x, mousePos.y, 0);
+        vec.unproject(sceneSetup.sceneObjects.camera);
+        vec.sub(sceneSetup.sceneObjects.camera.position);
+        // vec.z = 0;
+        // vec.normalize();
+        const p = new THREE.Vector3();
+        p.copy(sceneSetup.sceneObjects.camera.position).add(vec.multiplyScalar(sceneSetup.sceneObjects.camera.position.z));
+
+        p.z = nurbsObj.nurbsObj.position.z;
+
+        console.log(p);
+        
+        const curSurfaceDerivs = nurbsObj.calcNURBSSurfaceDerivativesXYZ(p, 1);
+
+        console.log("Current surface derivatives at point (" + String(p.x) + ", " + String(p.y) + ", 0): ");
+        console.log(curSurfaceDerivs);
+
+        console.log("Normalized derivatives: ");
+        console.log(curSurfaceDerivs[0][1].normalize());
+        console.log(curSurfaceDerivs[1][0].normalize());
+
+        return curSurfaceDerivs;
+    }
+
+    function handleKeyDown(event) {
+        try {
+            if (event instanceof KeyboardEvent) {
+                if (event.repeat) { return; } // Prevent holding down to undo or redo
+                switch (event.key) {
+                    case "d":
+                        testSurfaceDerivs(sceneSetup.mouse);
+                        break;
+                    default:
+                }
+            }
+        } catch (e) {
+            console.warn("nurbs-editor.index.handleKeyDown: Exception met while handling keyboard events in index.js. Is there a NURBS surface under the mouse?: ", e);
+        }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
     // document.addEventListener('keyup', handleKeyUp);
 
     sceneSetup.runRenderLoop(document, sceneSetup.defaultAnimateLoop());//document, sceneSetup.defaultAnimateLoop());//document, render());//sceneSetup.defaultAnimateLoop());
+    sceneSetup.setupDragControls();
+    sceneSetup.setupViewportResizeObserver();
 }
 
 main();
