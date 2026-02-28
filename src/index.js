@@ -53,43 +53,86 @@ const geomResolution = 20;          // Set num slices for NURBS parametric geome
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
 const showJsonEditor = false;
 
+// const defaultNurbsParams = {
+//     degree1: 3,
+//     degree2: 3,
+//     knots1: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
+//     knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
+//     weights: [
+//         [ 1, 1, 1, 1, 1 ],
+//         [ 1, 1, 1, 1, 1 ],
+//         [ 1, 1, 1, 1, 1 ],
+//         [ 1, 1, 1, 1, 1 ],
+//     ],
+//     // ctrlPts: [
+//     //     [
+//     //         new THREE.Vector4( - 200, - 200, 0, 1 ),
+//     //         new THREE.Vector4( - 200, - 100, 0, 1 ),
+//     //         new THREE.Vector4( - 200, 0, 0, 1 ),
+//     //         new THREE.Vector4( - 200, 100, 0, 1 )
+//     //     ],
+//     //     [
+//     //         new THREE.Vector4( -100, - 200, 0, 1 ),
+//     //         new THREE.Vector4( -100, - 100, 0, 1 ),
+//     //         new THREE.Vector4( -100, 0, 0, 1 ),
+//     //         new THREE.Vector4( -100, 100, 0, 1 )
+//     //     ],
+//     //     [
+//     //         new THREE.Vector4( 0, - 200, 0, 1 ),
+//     //         new THREE.Vector4( 0, - 100, 0, 1 ),
+//     //         new THREE.Vector4( 0, 0, 0, 1 ),
+//     //         new THREE.Vector4( 0, 100, 0, 1 )
+//     //     ],
+//     //     [
+//     //         new THREE.Vector4( 100, - 200, 0, 1 ),
+//     //         new THREE.Vector4( 100, - 100, 0, 1 ),
+//     //         new THREE.Vector4( 100, 0, 0, 1 ),
+//     //         new THREE.Vector4( 100, 100, 0, 1 )
+//     //     ]
+//     // ][
+//     ctrlPts: [
+//         [
+//             new THREE.Vector4( 0, 0, 0, 1 ),
+//             new THREE.Vector4( 0, 100, 0, 1 ),
+//             new THREE.Vector4( 0, 200, 0, 1 ),
+//             new THREE.Vector4( 0, 300, 0, 1 ),
+//             new THREE.Vector4( 0, 400, 0, 1 ),
+//         ],
+//         [
+//             new THREE.Vector4( 100, 0, 0, 1 ),
+//             new THREE.Vector4( 100, 100, 0, 1 ),
+//             new THREE.Vector4( 100, 200, 0, 1 ),
+//             new THREE.Vector4( 100, 300, 0, 1 ),
+//             new THREE.Vector4( 100, 400, 0, 1 )
+//         ],
+//         [
+//             new THREE.Vector4( 200, 0, 0, 1 ),
+//             new THREE.Vector4( 200, 100, 0, 1 ),
+//             new THREE.Vector4( 200, 200, 0, 1 ),
+//             new THREE.Vector4( 200, 300, 0, 1 ),
+//             new THREE.Vector4( 200, 400, 0, 1 )
+//         ],
+//         [
+//             new THREE.Vector4( 300, 0, 0, 1 ),
+//             new THREE.Vector4( 300, 100, 0, 1 ),
+//             new THREE.Vector4( 300, 200, 0, 1 ),
+//             new THREE.Vector4( 300, 300, 0, 1 ),
+//             new THREE.Vector4( 300, 400, 0, 1 )
+//         ]
+//     ]
+// }
 const defaultNurbsParams = {
-    degree1: 3,
-    degree2: 3,
-    knots1: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
-    knots2: [ 0, 0, 0, 0, 1, 1, 1, 1 ],
+    degree1: 4,
+    degree2: 4,
+    knots1: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
+    knots2: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
     weights: [
         [ 1, 1, 1, 1, 1 ],
         [ 1, 1, 1, 1, 1 ],
         [ 1, 1, 1, 1, 1 ],
         [ 1, 1, 1, 1, 1 ],
+        [ 1, 1, 1, 1, 1 ],
     ],
-    // ctrlPts: [
-    //     [
-    //         new THREE.Vector4( - 200, - 200, 0, 1 ),
-    //         new THREE.Vector4( - 200, - 100, 0, 1 ),
-    //         new THREE.Vector4( - 200, 0, 0, 1 ),
-    //         new THREE.Vector4( - 200, 100, 0, 1 )
-    //     ],
-    //     [
-    //         new THREE.Vector4( -100, - 200, 0, 1 ),
-    //         new THREE.Vector4( -100, - 100, 0, 1 ),
-    //         new THREE.Vector4( -100, 0, 0, 1 ),
-    //         new THREE.Vector4( -100, 100, 0, 1 )
-    //     ],
-    //     [
-    //         new THREE.Vector4( 0, - 200, 0, 1 ),
-    //         new THREE.Vector4( 0, - 100, 0, 1 ),
-    //         new THREE.Vector4( 0, 0, 0, 1 ),
-    //         new THREE.Vector4( 0, 100, 0, 1 )
-    //     ],
-    //     [
-    //         new THREE.Vector4( 100, - 200, 0, 1 ),
-    //         new THREE.Vector4( 100, - 100, 0, 1 ),
-    //         new THREE.Vector4( 100, 0, 0, 1 ),
-    //         new THREE.Vector4( 100, 100, 0, 1 )
-    //     ]
-    // ][
     ctrlPts: [
         [
             new THREE.Vector4( 0, 0, 0, 1 ),
@@ -103,25 +146,31 @@ const defaultNurbsParams = {
             new THREE.Vector4( 100, 100, 0, 1 ),
             new THREE.Vector4( 100, 200, 0, 1 ),
             new THREE.Vector4( 100, 300, 0, 1 ),
-            new THREE.Vector4( 100, 400, 0, 1 )
+            new THREE.Vector4( 100, 400, 0, 1 ),
         ],
         [
             new THREE.Vector4( 200, 0, 0, 1 ),
             new THREE.Vector4( 200, 100, 0, 1 ),
             new THREE.Vector4( 200, 200, 0, 1 ),
             new THREE.Vector4( 200, 300, 0, 1 ),
-            new THREE.Vector4( 200, 400, 0, 1 )
+            new THREE.Vector4( 200, 400, 0, 1 ),
         ],
         [
             new THREE.Vector4( 300, 0, 0, 1 ),
             new THREE.Vector4( 300, 100, 0, 1 ),
             new THREE.Vector4( 300, 200, 0, 1 ),
             new THREE.Vector4( 300, 300, 0, 1 ),
-            new THREE.Vector4( 300, 400, 0, 1 )
-        ]
+            new THREE.Vector4( 300, 400, 0, 1 ),
+        ],
+        [
+            new THREE.Vector4( 400, 0, 0, 1 ),
+            new THREE.Vector4( 400, 100, 0, 1 ),
+            new THREE.Vector4( 400, 200, 0, 1 ),
+            new THREE.Vector4( 400, 300, 0, 1 ),
+            new THREE.Vector4( 400, 400, 0, 1 ),
+        ],
     ]
-}
-
+};
 
 // Scene setup
 // ------------------------------------
@@ -139,7 +188,7 @@ function main() {
 
 
     // Scene setup
-    sceneSetup.sceneObjects.camera.position.z = 1;
+    sceneSetup.sceneObjects.camera.position.z = 1000;
     // sceneSetup.setupDragControls();
 
 
@@ -262,7 +311,7 @@ function main() {
     // // Add NURBS after its pts so pts get checked for intersection first
     // makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
-    const nurbsObj = new SurfaceObject({ threeScene: sceneSetup });
+    const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: defaultNurbsParams });
 
     // sceneSetup.sceneObjects.scene.add(nurbsObj);
     // sceneSetup.objects.push(nurbsObj);   // For keeping track
@@ -272,7 +321,7 @@ function main() {
     const grid = new THREE.GridHelper(10000, 250);
     grid.rotation.x = Math.PI * 0.5;
     grid.position.z = -1.1;
-    sceneSetup.sceneObjects.scene.add(grid);
+    // sceneSetup.sceneObjects.scene.add(grid);
     // sceneSetup.addObject(grid);
 
 
@@ -498,16 +547,25 @@ function main() {
 
     function testSurfaceDerivs(mousePos) {
         // Getting mouse position in THREE world space (https://stackoverflow.com/questions/13055214/mouse-canvas-x-y-to-three-js-world-x-y-z)
-        const vec = new THREE.Vector3(mousePos.x, mousePos.y, 0);
-        vec.unproject(sceneSetup.sceneObjects.camera);
-        vec.sub(sceneSetup.sceneObjects.camera.position);
+        // const vec = new THREE.Vector3(mousePos.x, mousePos.y, 0);
+        const p = new THREE.Vector3(mousePos.x, mousePos.y, 0);
+
+        // vec.unproject(sceneSetup.sceneObjects.camera);
+        // vec.sub(sceneSetup.sceneObjects.camera.position);
         // vec.z = 0;
         // vec.normalize();
-        const p = new THREE.Vector3();
-        p.copy(sceneSetup.sceneObjects.camera.position).add(vec.multiplyScalar(sceneSetup.sceneObjects.camera.position.z));
+        // const p = new THREE.Vector3();
+        // p.copy(sceneSetup.sceneObjects.camera.position).add(vec.multiplyScalar(sceneSetup.sceneObjects.camera.position.z));
+        // p.copy(sceneSetup.sceneObjects.camera.position);
+
+        // const p = ;
+
+
+        p.unproject(sceneSetup.sceneObjects.camera);
 
         p.z = nurbsObj.nurbsObj.position.z;
 
+        console.log("Current mouse point in coord space:");
         console.log(p);
         
         const curSurfaceDerivs = nurbsObj.calcNURBSSurfaceDerivativesXYZ(p, 1);
@@ -516,8 +574,11 @@ function main() {
         console.log(curSurfaceDerivs);
 
         console.log("Normalized derivatives: ");
-        console.log(curSurfaceDerivs[0][1].normalize());
-        console.log(curSurfaceDerivs[1][0].normalize());
+        const uPartial = new THREE.Vector3(curSurfaceDerivs[1][0].x, curSurfaceDerivs[1][0].y, curSurfaceDerivs[1][0].z);
+        const vPartial = new THREE.Vector3(curSurfaceDerivs[0][1].x, curSurfaceDerivs[0][1].y, curSurfaceDerivs[0][1].z);
+        console.log(uPartial.normalize());
+        console.log(vPartial.normalize());
+        // console.log(curSurfaceDerivs[1][0].normalize());
 
         return curSurfaceDerivs;
     }

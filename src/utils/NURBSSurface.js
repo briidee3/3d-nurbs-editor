@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
-import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcNURBSDerivatives } from 'three/examples/jsm/curves/NURBSUtils.js';
+import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcNURBSDerivatives, calcBasisFunctions } from 'three/examples/jsm/curves/NURBSUtils.js';
 // import './SplitElements.js';
 
 
@@ -21,12 +21,12 @@ export default class SurfaceObject {
             knots1: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
             knots2: [ 0, 0, 0, 0, 0, 1, 1, 1, 1, 1 ],
             weights: [
-                [ 1, 1, 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1, 1, 1 ],
-                [ 1, 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ],
+                [ 1, 1, 1, 1, 1 ]
             ],
             // ctrlPts: [
             //     [
@@ -215,9 +215,14 @@ export default class SurfaceObject {
     }
 
     updateNurbsPoint(indices, position) {
-        this.nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].x = position.x;
-        this.nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].y = position.y;
-        this.nurbsParams.ctrlPts[Number(indices[0])][Number(indices[1])].z = position.z;
+        indices[0] = Number(indices[0]);
+        indices[1] = Number(indices[1]);
+
+        this.nurbsParams.ctrlPts[indices[0]][indices[1]].x = position.x;
+        this.nurbsParams.ctrlPts[indices[0]][indices[1]].y = position.y;
+        this.nurbsParams.ctrlPts[indices[0]][indices[1]].z = position.z;
+        // this.nurbsParams.ctrlPts[indices[0]][indices[1]].w = this.nurbsParams.weights[indices[0]][indices[1]];
+        // this.nurbsParams.ctrlPts[indices[0]][indices[1]].set(position);
 
         return this.updateNurbs(this.nurbsParams);
     }
@@ -231,6 +236,7 @@ export default class SurfaceObject {
 
         // Replace the geometry
         return this.updateNurbs(this.nurbsParams);//, this.nurbsObj);
+        // return this.updateNurbsPoint([Number(curId[0]), Number(curId[1])], event.object);
     }
 
     // Algorithm A2.3 from The NURBS Book
@@ -380,11 +386,106 @@ export default class SurfaceObject {
         return SKL;
     }
 
+    // Modification of A2.2 (The NURBS Book) to return all nonzero basis funcs of degrees 0 to p
+    // calcAllBasisFuns(span, u, p, U) {
+
+    //     const N = [];
+    //     var index = 0;
+    //     const left = [];
+    //     const right = [];
+
+    //     for (var i = 1; i <= p; i++) {
+    //         N[j][0] = THREE.Vector3(1,1,1);
+    //         for (var j = 0; j <= i; j++) {
+    //             // index = span - i + j;
+    //             // N[index] = [];
+    //             // N[index][0] = 1;
+    //             // if (typeof N[j].concat !== 'function') { // check if array
+    //             //     N[j] = [];
+    //             // }
+    //             // N[j][i] = 
+
+    //             left[i] = u - U[span - i + j][i] = 
+
+    //             // Value of the ith-degree basis function, N_{span-i+j,i}(u)
+    //             N[j][i] = 
+    //         }
+    //     }
+    //     calcBasisFunctions();
+
+
+    //     for (var i = 0; i <= p; i++) {
+    //         N[i] = calcBasisFunctions(i, U, p, U);;
+    //     }
+    // }
+    
+    // Algorithm A3.8 from The NURBS Book
+    // calcBSplineSurfaceDerivativesAlt(p, U, q, V, P, u, v, d) {
+    //     const SKL = [];
+    //     // for (var i = 0; i <= p + 1; i++) {
+    //     //     for (var j = 0; j <= q + 1; j++) {
+    //     //         SKL[i] = [];
+    //     //         SKL[i][j] = null;
+    //     //     }
+    //     // }
+
+    //     const du = Math.min(d, p);
+    //     for (var k = p + 1; k <= d; k++) {
+    //         SKL[k] = [];
+    //         for (var l = 0; l <= d - k; l++) {
+    //             // SKL[k][l] = 0.0;
+    //             SKL[k][l] = new THREE.Vector4();
+    //         }
+    //     }
+
+    //     const dv = Math.min(d, q);
+    //     for (var l = q + 1; l <= d; l++) {
+    //         for (var k = 0; k <= d - l; k++) {
+    //             // SKL[k][l] = 0.0;
+    //             SKL[k] = [];
+    //             SKL[k][l] = new THREE.Vector4();
+    //         }
+    //     }
+        
+    //     const uspan = findSpan(p, u, U);
+    //     // const Nu = AllBasisFuns(uspan, u, p, du, U);
+    //     // const vspan = findSpan(q, v, V);
+    //     // const Nv = AllBasisFuns(vspan, v, q, dv, V);
+    //     // PKL = SurfaceDerivCpts;
+
+    //     var tmp = [];
+    //     var dd = 0;
+    //     for (var k = 0; k <= du; k++) {
+    //         if (typeof SKL[k] === 'undefined') { SKL[k] = []; }
+    //         for (var s = 0; s <= q; s++) {
+    //             // tmp[s] = 0;
+    //             tmp[s] = new THREE.Vector4();
+    //             for (var r = 0; r <= p; r++) {
+    //                 // tmp[s] += Nu[k][r] * P[uspan - p + r][vspan - q + s];
+    //                 tmp[s].add(P[uspan - p + r][vspan - q + s].clone().multiplyScalar(Nu[k][r]));
+    //             }
+    //         }
+    //         dd = Math.min(d - k, dv);
+    //         for (var l = 0; l <= dd; l++) {
+    //             // SKL[k][l] = 0;
+    //             SKL[k][l] = new THREE.Vector4();
+    //             for (var s = 0; s <= q; s++) {
+    //                 // SKL[k][l] = SKL[k][l] + Nv[l][s] * tmp[s];
+    //                 SKL[k][l].add(tmp[s].clone().multiplyScalar(Nv[l][s]));
+    //             }
+    //         }
+    //     }
+
+    //     return SKL;
+    // }
+
     // Algorithm A4.4 from The NURBS Book. Uses some bits from three.js/examples/jsm/curves/NURBSUtils.js
     calcRationalSurfaceDerivatives(Pders) {
         const nd = Pders.length - 1;
         var v = null;
         var v2 = null;
+
+        const SKL = [];
 
         const Aders = [];
         const wders = [];
@@ -402,6 +503,7 @@ export default class SurfaceObject {
         for (var k = 0; k <= nd; k++) {
             Aders[k] = [];
             wders[k] = [];
+            SKL[k] = [];
             for (var l = 0; l <= nd - k; l++) {
                 const point = Pders[k][l];
                 Aders[k][l] = new THREE.Vector3(point.x, point.y, point.z);
@@ -417,7 +519,7 @@ export default class SurfaceObject {
                     // v = v - calcKoverI(k, i) * wders[i][0] * Pders[k - i][1];
                     v.sub(Pders[k - i][l].clone().multiplyScalar(calcKoverI(k, i) * wders[i][0]));
                     // v2 = 0.0;
-                    v2 = new THREE.Vector3(0, 0, 0);
+                    v2 = new THREE.Vector3();
                     for (var j = 1; j <= l; j++) {
                         // v2 = v2 + calcKoverI(l, j) * wders[i][j] * Pders[k-i][l-j];
                         v2.add(Pders[k - i][l - j].clone().multiplyScalar(calcKoverI(l, j) * wders[i][j]));
@@ -426,7 +528,7 @@ export default class SurfaceObject {
                     v.sub(v2.clone().multiplyScalar(calcKoverI(k, i)));
                 }
                 // Pders[k][l] = v / wders[0][0];
-                Pders[k][l] = v.clone().multiplyScalar(1 / wders[0][0]);
+                SKL[k][l] = v.clone().multiplyScalar(1 / wders[0][0]);
             }
         }
 
@@ -444,12 +546,21 @@ export default class SurfaceObject {
             this.nurbsParams.ctrlPts, 
             u, v, d
         );
+        console.log("Pders:");
         console.log(Pders);
 
         return this.calcRationalSurfaceDerivatives(Pders);
     }
 
-    // Modified version of algorithm 2 from https://arxiv.org/pdf/2210.13160
+    /**
+     * Iteratively approximate the nearest point on a NURBS surface (u,v) to a given point (x,y,z). Modified version of algorithm 2 from https://arxiv.org/pdf/2210.13160
+     * @param {Number} dn  - Minimum distance traveled each iteration. Also serves to find the basis vectors for u and v
+     * @param {Number} tol - Maximum deviation between output of f(u, v) and point p, unless maxIt is reached first.
+     * @param {Number} maxIt - Maximum number of iterations
+     * @param {THREE.Vector3} p - Point in world space for which the nearest point on the NURBS surface will be approximated
+     * @param {Number} damp - Multiplier for dampCur when decreasing distance along u and v traveled per iteration 
+     * @returns 
+     */
     calcNearestSurfacePointFromPoint(dn, tol, maxIt, p, damp) {
         // const uDampInit = 0.5;    // Initialize dampers to uMax and vMax
         // const vDampInit = 0.5;
@@ -533,16 +644,16 @@ export default class SurfaceObject {
     }
 
     // Get surface derivatives given xyz point in world coordinates. Tol must be > minDistForUnitVectors.
-    calcNURBSSurfaceDerivativesXYZ(point, d) {
+    calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt) {
         // Offset p by the nurbsObj's position
         const p = point.clone();
         p.sub(this.nurbsObj.position);
         console.log(p);
 
-        const tol = 0.000001;
-        const minDistForUnitVectors = tol / 2;
-        const maxIterations = 60;
-        const uvCoords = this.calcNearestSurfacePointFromPoint(minDistForUnitVectors, tol, maxIterations, p, 0.5 );
+        const tol_ = tol || 0.000001;
+        const minDistForUnitVectors = tol_ / 2;
+        const maxIterations = maxIt || 60;
+        const uvCoords = this.calcNearestSurfacePointFromPoint(minDistForUnitVectors, tol_, maxIterations, p, 0.5 );
 
         console.log(uvCoords);
         const test = new THREE.Vector3();
