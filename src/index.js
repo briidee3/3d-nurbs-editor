@@ -44,8 +44,8 @@ import * as THREE from 'three';
 // import { DragControls } from 'three/addons/controls/DragControls.js';
 
 import BasicScene from './utils/BasicScene.js';
-import './utils/SplitElements.js';
-import SurfaceObject from './utils/NURBSSurface.js'
+// import './utils/SplitElements.js';
+import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ } from './utils/NURBSSurface.js'
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -568,7 +568,8 @@ function main() {
         console.log("Current mouse point in coord space:");
         console.log(p);
         
-        const curSurfaceDerivs = nurbsObj.calcNURBSSurfaceDerivativesXYZ(p, 1);
+        const sd = calcNURBSSurfaceDerivativesXYZ(p, 1, null, 100, nurbsObj.nurbsObj.position, nurbsObj.nurbsParams, nurbsObj.nurbsSurface)
+        const curSurfaceDerivs = sd.derivs;
 
         console.log("Current surface derivatives at point (" + String(p.x) + ", " + String(p.y) + ", 0): ");
         console.log(curSurfaceDerivs);
@@ -576,6 +577,8 @@ function main() {
         console.log("Normalized derivatives: ");
         const uPartial = new THREE.Vector3(curSurfaceDerivs[1][0].x, curSurfaceDerivs[1][0].y, curSurfaceDerivs[1][0].z);
         const vPartial = new THREE.Vector3(curSurfaceDerivs[0][1].x, curSurfaceDerivs[0][1].y, curSurfaceDerivs[0][1].z);
+        // const uPartial = new THREE.Vector3(curSurfaceDerivs[1][0].x, curSurfaceDerivs[1][0].y, curSurfaceDerivs[1][0].z);
+        // const vPartial = new THREE.Vector3(curSurfaceDerivs[0][1].x, curSurfaceDerivs[0][1].y, curSurfaceDerivs[0][1].z);
         console.log(uPartial.normalize());
         console.log(vPartial.normalize());
         // console.log(curSurfaceDerivs[1][0].normalize());
