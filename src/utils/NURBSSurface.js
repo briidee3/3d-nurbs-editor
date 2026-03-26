@@ -9,6 +9,7 @@ import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
 import { calcBasisFunctionDerivatives, findSpan, calcKoverI } from 'three/examples/jsm/curves/NURBSUtils.js';
+import { max } from 'three/src/nodes/math/MathNode.js';
 // import './SplitElements.js';
 
 
@@ -700,7 +701,7 @@ function isColliding() {
 // Convert control points from JSON back to THREEjs vectors
 function convertCtrlPtsToThree(P) {
     P.forEach((point) => {
-        return new Vector4(point.x, point.y, point.z, point.w);
+        return new THREE.Vector4(point.x, point.y, point.z, point.w);
     });
     
     return P;
@@ -712,7 +713,14 @@ function convertCtrlPtsToThree(P) {
 // Note to self: gonna wanna do this *with* pivoting (prevents divide by zero)
 // Presumably, should replace the upper triangular part of A with U and the "strictly" lower triangular part of A with U (check ALAFF for more info)
 // note to self: consider using weblas for WebGPU BLAS stuff in the future
-function LUDecomposition(A, q, sbw) {
+// note to self: should only store the nonzero band, when given sbw
+/*
+* returns d, which is +/-1 depending on if num of row interchanges was even or odd respectively
+* takes in A, q, sbw in accordance with TNB
+* also takes indx as per NRC2, WHPress et al.
+*/
+// Note to self: implement the SBW consideration when time allows
+function LUDecomposition(A, q, sbw, indx) {
     // we get upper from forward substitution phase of gaussian elimination
     // good resource https://graphics.stanford.edu/courses/cs205a-13-fall/assets/notes/chapter2.pdf pg 11
     //  resource for this https://www.cs.princeton.edu/courses/archive/fall20/cos302/notes/cos302_f20_precept5_lu_cholesky.pdf involves consideration of tridiagonal systems, i.e. sbw = 1
@@ -724,17 +732,125 @@ function LUDecomposition(A, q, sbw) {
     // that's all she wrote
 
     // is good that is O(n^2) b/c Gaussian elimination is O(n^3) also triangular matrices are generally more efficient to work with a lot of the time and so decomposing a regular ol matrix into a couple of 3-agons is bestest for optimizinations (hence its use by TNB, hence its use here, hence my consequent illumination on various highly consequential matters of ALAFF advanced linear algebra foundations to frontiers (Geijn, Myers, 19xx/20xx) anyways yehaw im gonna go take a nap adios for now)
+
+    // var sbw_ = sbw;
+    // if (!sbw) { // set default sbw to be for the entire matrix
+    //     sbw_ = q - 1;
+    // }
+    
+    // var curSum = 0;
+    // var curA
+    // // for (var j = 0; j < q; j++) {
+    // for (var j = 0; j < q; j++) {
+    // // for (var i = 0; i < j; i++) {
+    //     for (var i = 0; i < j; i++) {
+    //         curSum = 0;
+    //         for (var k = 0; k < i - 1; k++) {
+    //             curSum += A[i][k] * A[k][j];
+    //         }
+    //         A[i][j] -= curSum;
+    //     }
+    //     for (var i = j + 1; i < q; i++) {
+    //         curSum = 0;
+    //         for (var k = 0; k < j - 1; k++) {
+    //             curSum += A[i][k] * A[k][j];
+    //         }
+    //         A[i][j] = (1 / A[j][j]) * (A[i][j] - curSum);
+    //     }
+    // }
+
+
+
+    // Crout's method with partial pivoting as described in chapter 2 of Numerical recipes in C, 2nd edition, W. H. Press et al. to account for semibandwidth.
+    // Note to self: When time allows, implement consideration of the semibandwidth (sbw)
+    var i, imax, j, k, big, dum, sum, tmp, vv = [], d = 1;
+    // vv stores implicit scaling of each row
+
+    for (i = 0; i < q; i++) {
+        big = 0;
+        for (j = 0; j < q; j++) {
+
+            if ((tmp = Math.abs(A[i][j])) > big) big = tmp;
+        }
+        if (big == 0) console.error("Singular matrix in function LUDecomposition.");
+        // No nonzero largest element
+        vv[i] = 1 / big; // save scaling
+    }
+    for (j = 0; j < q; j++) {
+        for (i = 0; i < j; i++) {
+            sum = A[i][j];
+            for (k = 0; k < i; k++) sum -= A[i][k] * A[k][j];
+            A[i][j] = sum;
+        }
+        big = 0;        // initialize search for largest pivot element
+        for (i = j; i < q; i++) {
+            sum = A[i][j];
+            for (k = 0; k < j; k++) sum -= A[i][k] * A[k][j];
+            A[i][j] = sum;
+            if ((dum = vv[i] * Math.abs(sum)) >= big) {
+                // Is the (figure of merit) for the pivot better than the current best?
+                big = dum;
+                imax = i;
+            }
+        }
+        // Interchange rows?
+        if (j != imax) {
+            for (k = 0; k < q; k++) {
+                dum = A[imax][k];
+                A[imax][k] = A[j][k];
+                A[j][k] = dum;
+            }
+            d = -d; // change parity of d
+            vv[imax] = vv[j];   // also interchange scale factor
+        }
+        indx[j] = imax;
+        if (A[j][j] == 0) A[j][j] = 10 ** -20;      // If 0, make small instead. Some situations w/ singular matrices may be better to replace this w/ zero though
+        
+        // Divide by the pivot
+        if (j != n) {
+            dum = 1 / A[j][j];
+            for (i = j+1; i < q; i++) A[i][j] *= dum;
+        }
+        // delete vv;
+    }
+
+    return d;
+
 }
 
 
 // TNB pg 369
 // Perform forward/backward substitution
-function ForwardBackward(A, q, sbw, rhs, sol) {
+// Chapter 2 of Numerical recipes in C, 2nd edition, W.H. Press et al.
+// Assumes A is LU decomposition of some matrix
+function ForwardBackward(A, q, sbw, rhs, sol, indx) {
     // rhs[] is right hand side of system (coords of Q[k])
-    const rhs = [];
+    // const rhs = [];
 
     // sol[] is the solution vector (coords of P[i])
-    const sol = [];
+    // const sol = [];
+    
+    sol = JSON.parse(JSON.stringify(rhs));  // Copy RHS into sol
+
+    var i, ii = 0, ip, j, sum;
+
+    // Forward substitution
+    for (i = 0; i < q; i++) {
+        ip = indx[i];
+        sum = sol[ip];
+        sol[ip] = sol[i];
+        if (ii) for (j = ii; j < i; j++) sum -= A[i][j] * sol[j]; // when ii > 0, becomes first nonvanishing element of rhs. now doing forward substitution; gotta unscramble permutation as we go tho
+        else if (sum) ii = i;       // nonzero element encountered, so now on we'll have to do the sums in the above loop
+        sol[i] = sum;
+    }
+    // Backsubstitution
+    for (i = q; i > 0; i--) {
+        sum = sol[i];
+        for (j = i; j < q; j++) sum -= A[i][j] * sol[j];
+        sol[i] = sum / A[i][i]; // Store component of solution vector X
+    }
+    
+    return rhs, sol;
 }
 
 
