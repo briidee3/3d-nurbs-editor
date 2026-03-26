@@ -706,6 +706,94 @@ function convertCtrlPtsToThree(P) {
     return P;
 }
 
+
+// TNB pg 369
+// "Decompose the q x q coefficient matrix with semibandwidth sbw into lower and upper triangular components, assuming A is a qxq square array"
+// Note to self: gonna wanna do this *with* pivoting (prevents divide by zero)
+// Presumably, should replace the upper triangular part of A with U and the "strictly" lower triangular part of A with U (check ALAFF for more info)
+// note to self: consider using weblas for WebGPU BLAS stuff in the future
+function LUDecomposition(A, q, sbw) {
+    // we get upper from forward substitution phase of gaussian elimination
+    // good resource https://graphics.stanford.edu/courses/cs205a-13-fall/assets/notes/chapter2.pdf pg 11
+    //  resource for this https://www.cs.princeton.edu/courses/archive/fall20/cos302/notes/cos302_f20_precept5_lu_cholesky.pdf involves consideration of tridiagonal systems, i.e. sbw = 1
+
+    // note to self: actually, all u gotta do is the standford algorithm but add pivoting then to consider sbw, instead of going n times for the thing, just go sbw indices from the main diagonal, that's all u gotta do for now
+    // upper triangular --> solve by backsubstitution [ is O(n^2) ]
+    // lower triangular --> forward substitution [ is O(n^2) ]
+    // get both s.t. diag is 1s then store in A
+    // that's all she wrote
+
+    // is good that is O(n^2) b/c Gaussian elimination is O(n^3) also triangular matrices are generally more efficient to work with a lot of the time and so decomposing a regular ol matrix into a couple of 3-agons is bestest for optimizinations (hence its use by TNB, hence its use here, hence my consequent illumination on various highly consequential matters of ALAFF advanced linear algebra foundations to frontiers (Geijn, Myers, 19xx/20xx) anyways yehaw im gonna go take a nap adios for now)
+}
+
+
+// TNB pg 369
+// Perform forward/backward substitution
+function ForwardBackward(A, q, sbw, rhs, sol) {
+    // rhs[] is right hand side of system (coords of Q[k])
+    const rhs = [];
+
+    // sol[] is the solution vector (coords of P[i])
+    const sol = [];
+}
+
+
+// TNB Algorithm A9.7
+// Global surface approx with fixed num of ctrl pts
+// Input: r, s, Q, p, q, n, m
+// Output: U, V, P
+function globalSurfApproxFixednm(r, s, Q, p, q, n, m) {
+
+    SurfMeshParams(r, s, Q, Uint8BufferAttribute, vb);
+
+    // Compute knots U by Eqs. (9.68), (9.69)
+    const U = [];
+    // Compute knots V by Eqs. (9.68), (9.69)
+    const V = [];
+    // Compute Nu[][] and NTNu[][] using Eq. (9.66)
+    const Nu = [];
+    const NTNu = [];
+    
+    LUDecomposition(NTNu, n - 1, p);
+
+    const tmp = [];
+    for (var j = 0; j <= s; j++) {
+        // u direction fits
+        tmp[0][j] = Q[0][j];
+        tmp[n][j] = Q[r][j];
+
+        // Compute and load Ru[] (Eqs. [9.63] and [9.67])
+        const Ru = [];
+
+        // Call ForwardBackward() to get control points
+        // tmp[1][j], ..., tmp[n-1][j];
+    }
+
+    // Compute Nv[][] and NTNv[][] using Eq. (9.66)
+    const Nv = [];
+    const NTNv = [];
+
+    const P = []
+
+    LUDecomposition(NTNv, m - 1, q);
+
+    for (var i = 0; i <= n; i++) {
+        // v direction fits
+        P[i][0] = tmp[i][0];
+        P[i][m] = tmp[i][s];
+
+        // Copmute and load Rv[] (Eqs. [9.63], [9.67])
+        const Rv = [];
+
+        // Call ForwardBackward() to get the control points
+        // P[i][1], ..., P[i][m-1]
+    }
+
+    return U, V, P;
+}
+
+
+
 export {
     SurfaceObject,
     calcNURBSSurfaceDerivatives,
