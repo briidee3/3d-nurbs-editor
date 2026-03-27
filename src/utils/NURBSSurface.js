@@ -8,8 +8,10 @@ import * as THREE from 'three';
 import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
-import { calcBasisFunctionDerivatives, findSpan, calcKoverI } from 'three/examples/jsm/curves/NURBSUtils.js';
+import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcBasisFunctions } from 'three/examples/jsm/curves/NURBSUtils.js';
 import { max } from 'three/src/nodes/math/MathNode.js';
+import { int } from 'three/tsl';
+import * as math from 'mathjs';
 // import './SplitElements.js';
 
 
@@ -720,6 +722,14 @@ function convertCtrlPtsToThree(P) {
 * also takes indx as per NRC2, WHPress et al.
 */
 // Note to self: implement the SBW consideration when time allows
+/**
+ * 
+ * @param {*} A - Matrix to be decomposed in place
+ * @param {*} q - Size of the qxq matrix A
+ * @param {*} sbw - Semibandwidth of A (if none, ignored)
+ * @param {*} indx - Store indices of permutations
+ * @returns 
+ */
 function LUDecomposition(A, q, sbw, indx) {
     // we get upper from forward substitution phase of gaussian elimination
     // good resource https://graphics.stanford.edu/courses/cs205a-13-fall/assets/notes/chapter2.pdf pg 11
@@ -807,7 +817,7 @@ function LUDecomposition(A, q, sbw, indx) {
         if (A[j][j] == 0) A[j][j] = 10 ** -20;      // If 0, make small instead. Some situations w/ singular matrices may be better to replace this w/ zero though
         
         // Divide by the pivot
-        if (j != n) {
+        if (j != q) {
             dum = 1 / A[j][j];
             for (i = j+1; i < q; i++) A[i][j] *= dum;
         }
@@ -854,56 +864,384 @@ function ForwardBackward(A, q, sbw, rhs, sol, indx) {
 }
 
 
+// 3D distance
+function distance3D(p1, p2) {
+    // Handle as arrays if arrays
+    if (Array.isArray(p1) && Array.isArray(p2)) 
+        return Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2);
+    // Else handle as objects with x,y,z properties
+    else
+        return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2 + (p2.z - p1.z) ** 2);
+}
+
+
+// TNB Algorithm A9.3
+/**
+ * Compute parameters for global surface interpolation
+ * @param {*} n - Num data points along u - 1
+ * @param {*} m - Num data points along v - 1
+ * @param {*} Q - Data points to fit to
+ * @param {*} uk - Output for uk
+ * @param {*} vl - Output for vl
+ */
+function surfMeshParams(n, m, Q, uk, vl) {
+    var num = m + 1;    // Num of nondegenerate rows
+    uk[0] = 0; uk[n] = 1;
+    vl[0] = 0; vl[n] = 1;
+    var k, l, d;
+    var total;
+
+    // Create and fill empty array for holding tmp vals
+    const cds = [];
+    cds.length = n + 1;
+    cds.fill(0);
+
+    // Initialize out vecs
+    for (k = 1; k < n; k++) {
+        uk[k] = 0;
+        vl[k] = 0;
+    }
+
+
+    // Handle uk
+    for (l = 0; l <= m; l++) {
+        total = 0; // total chord length of row
+        for (k = 1; k <= n; k++) {
+            cds[k] = distance3D(Q[k][l], Q[k-1][l]);
+            total += cds[k];
+        }
+        if (total == 0) num -= 1;
+        else {
+            d = 0;
+            for (k = 1; k < n; k++) {
+                d += cds[k];
+                uk[k] += d / total;
+            }
+        }
+    }
+    if (num == 0) {
+        console.error("0 nondegenerate rows in surfMeshParams()");
+        return -1;
+    }
+    for (k = 1; k < n; k++) uk[k] /= num;
+
+    // Handle vl
+    for (k = 0; k <= m; k++) {
+        total = 0; // total chord length of column
+        for (l = 1; l <= n; l++) {
+            cds[l] = distance3D(Q[k][l], Q[k][l - 1]);
+            total += cds[l];
+        }
+        if (total == 0) num -= 1;
+        else {
+            d = 0;
+            for (l = 1; l < n; l++) {
+                d += cds[l];
+                vl[l] += d / total;
+            }
+        }
+    }
+    if (num == 0) {
+        console.error("0 nondegenerate rows in surfMeshParams()");
+        return -1;
+    }
+    for (l = 1; l < n; l++) vl[l] /= num;
+
+}
+
+
+// TNB Compute knots U by Eqs. 9.68 and 9.69
+/**
+ * @param {*} p - Degree of nonrational curve (>= 1)
+ * @param {*} n - Number of basis functions (>= p)
+ * @param {*} m - Number of points to be approximated (>= n)
+ * @param {*} r - Length of knot vector U - 1
+ * @param {*} U - Array to write knot vecs to
+ * @param {*} ub - ubar (can be acquired from surfMeshParams)
+ */
+// function computeKnots(p, n, m, r, U, ub) {
+function computeKnots(numPts, deg, numCtrlPts, U, ub) {
+    var i, j, alpha;
+    const d = numPts / (numCtrlPts - deg);
+
+    // Initialize with all zeros
+    U.length = deg + 1;
+    U.fill(0);
+
+    for (j = 1; j < numCtrlPts - deg; j++) {
+        i = Math.round(j*d);
+        alpha = j * d - i;
+        U.push((1 - alpha) * ub[i - 1] + alpha * ub[i]);
+    }
+
+    // End knot vector
+    for (i = 0; i < deg + 1; i++) U.push(1);
+
+    return U;
+}
+
+
+// TNB A2.4 & https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/helpers.py
+/**
+ * 
+ * @param {*} p - Degree
+ * @param {*} U - Knot vector
+ * @param {*} i - Span
+ * @param {*} u - Knot
+ * @returns 
+ */
+function calcBasisFuncOne(p, U, i, u) {
+    var j, k, tmp, saved, Uleft, Uright;
+
+    if ((i == 0 && u == U[0]) || (i == U.length - p - 1 && u == U[U.length])) { // Special cases
+        return 1;
+    }
+    if (u < U[i] || u >= U[i + p + 1]) { 
+        return 0;
+    }
+
+    const N = [];
+    N.length = p + i + 1;
+    N.fill(0);
+
+    // Initialize zeroth-degree functs
+    for (j = 0; j <= p; j++) {
+        if (u >= U[i + j] && u < U[i + j + 1]) N[j] = 1;
+        else N[j] = 0;
+    }
+    // Compute triangular table
+    for (k = 1; k <= p; k++) {
+        if (N[0] == 0) saved = 0;
+        else saved = ((u - U[i]) * N[0]) / (U[i + k] - U[i]);
+        for (j = 0; j < p - k + 1; j++) {
+            Uleft = U[i + j + 1];
+            Uright = U[i + j + k + 1];
+            if (N[j + 1] == 0) {
+                N[j] = saved;
+                saved = 0;
+            }
+            else {
+                tmp = N[j + 1] / (Uright - Uleft);
+                N[j] = saved + (Uright - u) * tmp;
+                saved = (u - Uleft) * tmp;
+            }
+
+        }
+    }
+
+    return N[0];
+}
+
+
+// TNB compute N by Eq. 9.66 and https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/fitting.py
+/**
+ * @param {*} p - Degree of nonrational curve (>= 1)
+ * @param {*} n - Number of control points in U direction - 1
+ * @param {*} r - number of data points in U direction - 1
+ */
+function computeN(p, n, r, N, U, ub) {
+    var i, j, m_tmp = [];
+
+    // for (j = 0; j < m - 1; j++) {
+    //     // for (i = 0; i < n - 1; i ++) {
+    //     N[i][j] = calcBasisFunctions(n - 1, ub[j], p, U);           // NOTE TO SELF: DOUBLE CHECK THIS ASAP
+    //     // }
+    // }
+    
+
+    for (i = 1; i < r; i++) {
+        m_tmp = [];
+        for (j = 1; j < n; j++) {
+            m_tmp.push(calcBasisFuncOne(p, U, j, ub[i]));
+        }
+        N.push(m_tmp);
+    }
+
+    return N;
+}
+
+
+
 // TNB Algorithm A9.7
 // Global surface approx with fixed num of ctrl pts
 // Input: r, s, Q, p, q, n, m
 // Output: U, V, P
+/**
+ * 
+ * @param {*} r - Number of points to be approximated in U direction
+ * @param {*} s - Number of points to be approximated in V direction
+ * @param {*} Q - Points to fit
+ * @param {*} p - Degree of curve in U direction (>= 1)
+ * @param {*} q - Degree of curve in V direction (>= 1)
+ * @param {*} n - Number of control points in U direction
+ * @param {*} m - Number of control points in V direction
+ * @returns 
+ */
 function globalSurfApproxFixednm(r, s, Q, p, q, n, m) {
 
-    SurfMeshParams(r, s, Q, Uint8BufferAttribute, vb);
+    var i, j, k, l, tmp_1, tmp_2, tmp_3, Rku, Ru, Rkv, Rv, R_tmp, n0p, nnp, elem2, elem3;
+    // const ud = (m + 1) / (n - q + 1);
+    // const vd = (m + 1) / (n - q + 1);
+
+    const ub = [], vb = [], sol_u = [], sol_v = [];
+    
+
+    surfMeshParams(r, s, Q, ub, vb);
 
     // Compute knots U by Eqs. (9.68), (9.69)
     const U = [];
+    computeKnots(r, p, n, U, ub);
+
     // Compute knots V by Eqs. (9.68), (9.69)
     const V = [];
+    computeKnots(s, q, m, V, vb);
+
+    
     // Compute Nu[][] and NTNu[][] using Eq. (9.66)
     const Nu = [];
-    const NTNu = [];
+    computeN(p, n, r, Nu, U, ub)
+
+    const NuT = math.transpose(Nu);
+    const NuTNu = math.multiply(NuT, Nu);
     
-    LUDecomposition(NTNu, n - 1, p);
+    const indxu = [];
+    LUDecomposition(NuTNu, NuTNu.length, p, indxu);
 
     const tmp = [];
-    for (var j = 0; j <= s; j++) {
-        // u direction fits
+    tmp.length = n + 1;
+    tmp.fill([]);
+    for (j = 0; j < tmp.length; j++) {
+        tmp[j].length = s + 1;
+        tmp[j].fill(0);
+    }
+
+    // Fit in u direction
+    for (j = 0; j <= s; j++) {
         tmp[0][j] = Q[0][j];
         tmp[n][j] = Q[r][j];
 
         // Compute and load Ru[] (Eqs. [9.63] and [9.67])
-        const Ru = [];
+        // Compute Rku (Eq. 9.63)
+        Rku = [];
+        for (i = 1; i < r - 1; i++) {
+            n0p = calcBasisFuncOne(p, U, 0, ub[i]);
+            nnp = calcBasisFuncOne(p, U, n, ub[i]);
+            elem2 = [Q[0][j][0] * n0p, Q[0][j][1] * n0p, Q[0][j][2] * n0p];
+            elem3 = [Q[r][j][0] * nnp, Q[r][j][1] * nnp, Q[r][j][2] * nnp];
+            Rku.push([Q[i][j][0] - elem2[0] - elem3[0], Q[i][j][1] - elem2[1] - elem3[1], Q[i][j][2] - elem2[2] - elem3[2]])
+        }
 
-        // Call ForwardBackward() to get control points
+        // Compute Ru (Eq. 9.67)
+        Ru = [];
+        Ru.length = Q[0][0].length;
+        Ru.fill([]);
+        for (i = 0; i < Q[0][0].length; i++) {
+            Ru[i].length = n - 1;
+            Ru[i].fill(0);
+        }
+        for (i = 1; i < n; i++) {
+            R_tmp = [];
+            for (k = 0; k < Rku.length; k++) {
+                tmp_1 = calcBasisFuncOne(p, U, i, ub[k + 1]);
+                R_tmp.append([[Rku[i][0] * tmp_1, Rku[i][1] * tmp_1, Rku[i][2] * tmp_1]]);
+            }
+            for (k = 0; k < Q[0][0].length; k++) {
+                for (l = 0; l < R_tmp.length; l++) {
+                    Ru[i - 1][k] += R_tmp[l][k];
+                }
+            }
+        }
+        
+        // Call ForwardBackward() to get intermediate control points
         // tmp[1][j], ..., tmp[n-1][j];
+        for (i = 0; i < Q[0][0].length; i++) {
+            tmp_1 = [];
+            for (k = 0; k < Ru.length; k++) {
+                tmp_1.push(Ru[k][i]);
+            }
+
+            ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
+            for (k = 1; k < n; k++) {
+                tmp[k][j][i] = tmp_1[k - 1];
+            }
+        }
     }
 
-    // Compute Nv[][] and NTNv[][] using Eq. (9.66)
+
+
+    // Compute Nv[][] and NvTNv[][] using Eq. (9.66)
     const Nv = [];
-    const NTNv = [];
+    computeN(q, m, s, Nv, V, vb)
 
-    const P = []
+    const NvT = math.transpose(Nv);
+    const NvTNv = math.multiply(NvT, Nv);
+    
+    const indxv = [];
+    LUDecomposition(NvTNv, NvTNv.length, q, indxv);
 
-    LUDecomposition(NTNv, m - 1, q);
-
-    for (var i = 0; i <= n; i++) {
-        // v direction fits
-        P[i][0] = tmp[i][0];
-        P[i][m] = tmp[i][s];
-
-        // Copmute and load Rv[] (Eqs. [9.63], [9.67])
-        const Rv = [];
-
-        // Call ForwardBackward() to get the control points
-        // P[i][1], ..., P[i][m-1]
+    const ctrlPts = [];
+    ctrlPts.length = n + 1;
+    ctrlPts.fill([]);
+    for (j = 0; j < tmp.length; j++) {
+        ctrlPts[j].length = m + 1;
+        ctrlPts[j].fill(0);
     }
+
+    // Fit in v direction
+    for (j = 0; j <= n; j++) {
+        ctrlPts[j][0] = tmp[j][0];
+        ctrlPts[j][m] = tmp[j][s];
+
+        // Compute and load Rv[] (Eqs. [9.63] and [9.67])
+        // Compute Rkv (Eq. 9.63)
+        Rkv = [];
+        for (i = 1; i < m; i++) {
+            n0p = calcBasisFuncOne(p, U, 0, ub[i]);
+            nnp = calcBasisFuncOne(p, U, m, ub[i]);
+            elem2 = [tmp[0][j][0] * n0p, tmp[0][j][1] * n0p, tmp[0][j][2] * n0p];
+            elem3 = [tmp[r][j][0] * nnp, tmp[r][j][1] * nnp, tmp[r][j][2] * nnp];
+            Rkv.push([tmp[i][j][0] - elem2[0] - elem3[0], tmp[i][j][1] - elem2[1] - elem3[1], tmp[i][j][2] - elem2[2] - elem3[2]])
+        }
+
+        // Compute Rv (Eq. 9.67)
+        Rv = [];
+        Rv.length = Q[0][0].length;
+        Rv.fill([]);
+        for (i = 0; i < Q[0][0].length; i++) {
+            Rv[i].length = m - 1;
+            Rv[i].fill(0);
+        }
+
+        for (i = 1; i < m; i++) {
+            R_tmp = [];
+            for (k = 0; k < Rkv.length; k++) {
+                tmp_1 = calcBasisFuncOne(q, V, i, vb[k + 1]);
+                R_tmp.append([[Rkv[i][0] * tmp_1, Rkv[i][1] * tmp_1, Rkv[i][2] * tmp_1]]);
+            }
+            for (k = 0; k < Q[0][0].length; k++) {
+                for (l = 0; l < R_tmp.length; l++) {
+                    Rv[i - 1][k] += R_tmp[l][k];
+                }
+            }
+        }
+        
+        // Call ForwardBackward() to get intermediate control points
+        // tmp[1][j], ..., tmp[n-1][j];
+        for (i = 0; i < Q[0][0].length; i++) {
+            tmp_1 = [];
+            for (k = 0; k < Rv.length; k++) {
+                tmp_1.push(Rv[k][i]);
+            }
+
+            ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
+            for (k = 1; k < n; k++) {
+                ctrlPts[k][j][i] = tmp_1[k - 1];
+            }
+        }
+    }
+
+    const P = ctrlPts;
+
 
     return U, V, P;
 }
@@ -917,5 +1255,13 @@ export {
     calcBSplineSurfaceDerivatives,
     calcRationalSurfaceDerivatives,
     calcNearestSurfacePointFromPoint,
-    isColliding
+    isColliding,
+    computeN,
+    calcBasisFuncOne,
+    computeKnots,
+    surfMeshParams,
+    distance3D,
+    LUDecomposition,
+    ForwardBackward,
+    globalSurfApproxFixednm
 };
