@@ -46,15 +46,15 @@ import * as THREE from 'three';
 import BasicScene from './utils/BasicScene.js';
 // import './utils/SplitElements.js';
 import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ, globalSurfApproxFixednm } from './utils/NURBSSurface.js'
-import { string } from 'mathjs';
+import * as math from 'mathjs';
 
-import * as testDataFile from './test/flat_lens_map.json';
+import * as testDataFile from './test/flat_lens_map_weights.json';
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const geomResolution = 20;          // Set num slices for NURBS parametric geometry
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
-const showJsonEditor = true;
+const showJsonEditor = false;
 
 // const defaultNurbsParams = {
 //     degree1: 3,
@@ -351,6 +351,9 @@ function main() {
     // makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
 
+
+    
+
     const curNurbsParams = JSON.parse(JSON.stringify(defaultNurbsParams));
 
     // Load points for use in approximation. Keep in mind, they're formatted as arrays, not actual point objects (such as THREE.Vector3)
@@ -367,18 +370,23 @@ function main() {
     
     // TODO: Add consideration of weights associated w/ data points in jsonData; let weight = 1/weight, since the weight in the JSON data is the distance between the point and the const. U or V value it's supposed to be associated with.
 
-    const numPts_uDir = jsonData.data.length;
-    const numPts_vDir = jsonData.data[0].length;
+    const data = jsonData.data;
+
+    const numPts_uDir = data.length;
+    const numPts_vDir = data[0].length;
+    // const numPts_vDir = jsonData.data.length;
+    // const numPts_uDir = jsonData.data[0].length;
     console.log(jsonData)
+    console.log(data)
     const deg_u = 4;
     const deg_v = 4;
     // const numCtrlPts_u = 5;
     // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
-    const numCtrlPts_u = 21;
-    const numCtrlPts_v = 6;
+    const numCtrlPts_u = 6;
+    const numCtrlPts_v = 18;
     
     // Get params for approximated surface
-    var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, jsonData.data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P);
+    var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P);
     console.log("U");
     console.log(U);
     console.log("V");
