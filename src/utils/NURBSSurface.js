@@ -2,6 +2,8 @@
 
 /*
 Wrapper/manager for NURBS surface objects in THREE js
+TODO:
+- Add algorithm A9.4 from TNB, modify to handle partial derivatives at data points as described pg. 382
 */
 
 import * as THREE from 'three';
@@ -12,7 +14,11 @@ import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcBasisFunctions 
 import { max } from 'three/src/nodes/math/MathNode.js';
 import { int } from 'three/tsl';
 import * as math from 'mathjs';
+import { exponentialHeightFogFactor } from 'three/tsl';
 // import './SplitElements.js';
+
+
+
 
 
 
@@ -178,8 +184,13 @@ class SurfaceObject {
             row.forEach( (vec4) => {
                 var pt = new THREE.Mesh(
                     new THREE.SphereGeometry(this.sizeOfCtrlPts, 10, 10),
-                    new THREE.MeshBasicMaterial({
-                        color: 0xFFFFFF
+                    // new THREE.MeshBasicMaterial({
+                    //     color: 0xFFFFFF
+                    // })
+                    new THREE.MeshPhongMaterial({
+                        color: 0xFFFFFF,
+                        opacity: 0.4,
+                        transparent: true
                     })
                 );
                 pt.position.set(vec4.x, vec4.y, vec4.z);
@@ -250,6 +261,22 @@ class SurfaceObject {
 
     calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt) {
         calcNURBSSurfaceDerivativesXYZ(point, d, tol, maxIt, this.nurbsObj.position, this.nurbsParams, this.nurbsSurface);
+    }
+
+    scaleNURBSSurface(scaleFactor) {
+        // this.updateNurbs(scaleNURBSSurface(scaleFactor, this.nurbsParams, this.nurbsObj.position));
+        // this.nurbsParams.ctrlPts.forEach((point) => {
+        //     point.x = (point.x - this.nurbsObj.position.x) * scaleFactor + this.nurbsObj.position.x;
+        //     point.y = (point.y - this.nurbsObj.position.y) * scaleFactor + this.nurbsObj.position.y;
+        //     point.z = (point.z - this.nurbsObj.position.z) * scaleFactor + this.nurbsObj.position.z;
+        //     // Leave weights alone
+        // })
+        for (var i = 0; i < this.nurbsParams.ctrlPts.length; i++) {
+            for (var j = 0; j < this.nurbsParams.ctrlPts[i].length; j++) {
+                this.nurbsParams.ctrlPts[i][j] = new THREE.Vector4((this.nurbsParams.ctrlPts[i][j].x - this.nurbsObj.position.x) * scaleFactor + this.nurbsObj.position.x, (this.nurbsParams.ctrlPts[i][j].y - this.nurbsObj.position.y) * scaleFactor + this.nurbsObj.position.y, 0, 1);
+            }
+        }
+        this.updateNurbs(this.nurbsParams);
     }
 };
 
@@ -769,6 +796,7 @@ function LUDecomposition(A, q, sbw, indx) {
     //     }
     // }
 
+    // console.log(A);
 
 
     // Crout's method with partial pivoting as described in chapter 2 of Numerical recipes in C, 2nd edition, W. H. Press et al. to account for semibandwidth.
@@ -823,6 +851,7 @@ function LUDecomposition(A, q, sbw, indx) {
         }
         // delete vv;
     }
+    console.log(A);
 
     return d;
 
@@ -833,14 +862,14 @@ function LUDecomposition(A, q, sbw, indx) {
 // Perform forward/backward substitution
 // Chapter 2 of Numerical recipes in C, 2nd edition, W.H. Press et al.
 // Assumes A is LU decomposition of some matrix
-function ForwardBackward(A, q, sbw, rhs, sol, indx) {
+function ForwardBackward(A, q, sbw, rhs, sol_, indx) {
     // rhs[] is right hand side of system (coords of Q[k])
     // const rhs = [];
 
     // sol[] is the solution vector (coords of P[i])
     // const sol = [];
     
-    sol = JSON.parse(JSON.stringify(rhs));  // Copy RHS into sol
+    const sol = JSON.parse(JSON.stringify(rhs));  // Copy RHS into sol
 
     var i, ii = 0, ip, j, sum;
 
@@ -854,37 +883,51 @@ function ForwardBackward(A, q, sbw, rhs, sol, indx) {
         sol[i] = sum;
     }
     // Backsubstitution
-    for (i = q; i > 0; i--) {
+    for (i = q - 1; i > 0; i--) {
         sum = sol[i];
         for (j = i; j < q; j++) sum -= A[i][j] * sol[j];
         sol[i] = sum / A[i][i]; // Store component of solution vector X
     }
+
+    console.log(rhs)
+    console.log(sol)
+    sol_.sol = sol;
     
-    return rhs, sol;
+    return { rhs: rhs, sol: sol };
 }
 
 
 // 3D distance
-function distance3D(p1, p2) {
+function distance3D(p1, p2, asArray = true) {
+
     // Handle as arrays if arrays
-    if (Array.isArray(p1) && Array.isArray(p2)) 
-        return Math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2 + (p2[2] - p1[2]) ** 2);
+    if (asArray) {
+        const val = Math.pow(p2[0] - p1[0], 2) + Math.pow(p2[1] - p1[1], 2)
+        if (p1.length == 3) return Math.sqrt(val + Math.pow(p2[2] - p1[2], 2));
+        else return Math.sqrt(val);
+    }
     // Else handle as objects with x,y,z properties
-    else
-        return Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2 + (p2.z - p1.z) ** 2);
+    else {
+        const val = Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2);
+        if (p1.length == 3) return Math.sqrt(val + Math.pow(p2.z - p1.z, 2));
+        else return Math.sqrt(val);
+    }
 }
 
 
 // TNB Algorithm A9.3
 /**
  * Compute parameters for global surface interpolation
- * @param {*} n - Num data points along u - 1
- * @param {*} m - Num data points along v - 1
+ * @param {*} n - Num data points along u
+ * @param {*} m - Num data points along v
  * @param {*} Q - Data points to fit to
  * @param {*} uk - Output for uk
  * @param {*} vl - Output for vl
  */
 function surfMeshParams(n, m, Q, uk, vl) {
+    // n -= 1;
+    // m -= 1;
+
     var num = m + 1;    // Num of nondegenerate rows
     uk[0] = 0; uk[n] = 1;
     vl[0] = 0; vl[n] = 1;
@@ -925,6 +968,8 @@ function surfMeshParams(n, m, Q, uk, vl) {
     }
     for (k = 1; k < n; k++) uk[k] /= num;
 
+    num = n + 1;
+
     // Handle vl
     for (k = 0; k <= m; k++) {
         total = 0; // total chord length of column
@@ -946,30 +991,29 @@ function surfMeshParams(n, m, Q, uk, vl) {
         return -1;
     }
     for (l = 1; l < n; l++) vl[l] /= num;
-
 }
 
 
 // TNB Compute knots U by Eqs. 9.68 and 9.69
 /**
- * @param {*} p - Degree of nonrational curve (>= 1)
- * @param {*} n - Number of basis functions (>= p)
- * @param {*} m - Number of points to be approximated (>= n)
- * @param {*} r - Length of knot vector U - 1
+ * @param {Number} numPts - Number of data points being used for the fit
+ * @param {Number} deg - Degree of nonrational curve (>= 1)
+ * @param {Number} numCtrlPts - Number of control points desired
  * @param {*} U - Array to write knot vecs to
  * @param {*} ub - ubar (can be acquired from surfMeshParams)
  */
 // function computeKnots(p, n, m, r, U, ub) {
 function computeKnots(numPts, deg, numCtrlPts, U, ub) {
     var i, j, alpha;
-    const d = numPts / (numCtrlPts - deg);
+    // const d = (numPts + 1) / (numCtrlPts - deg + 1);
+    const d = (numPts) / (numCtrlPts - deg);
 
     // Initialize with all zeros
     U.length = deg + 1;
     U.fill(0);
 
     for (j = 1; j < numCtrlPts - deg; j++) {
-        i = Math.round(j*d);
+        i = Math.floor(j*d);
         alpha = j * d - i;
         U.push((1 - alpha) * ub[i - 1] + alpha * ub[i]);
     }
@@ -1036,8 +1080,8 @@ function calcBasisFuncOne(p, U, i, u) {
 // TNB compute N by Eq. 9.66 and https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/fitting.py
 /**
  * @param {*} p - Degree of nonrational curve (>= 1)
- * @param {*} n - Number of control points in U direction - 1
- * @param {*} r - number of data points in U direction - 1
+ * @param {*} n - Number of control points in U direction
+ * @param {*} r - number of data points in U direction
  */
 function computeN(p, n, r, N, U, ub) {
     var i, j, m_tmp = [];
@@ -1054,8 +1098,11 @@ function computeN(p, n, r, N, U, ub) {
         for (j = 1; j < n; j++) {
             m_tmp.push(calcBasisFuncOne(p, U, j, ub[i]));
         }
+        // console.log(m_tmp);
         N.push(m_tmp);
     }
+
+    // console.log(N);
 
     return N;
 }
@@ -1068,33 +1115,46 @@ function computeN(p, n, r, N, U, ub) {
 // Output: U, V, P
 /**
  * 
- * @param {*} r - Number of points to be approximated in U direction
- * @param {*} s - Number of points to be approximated in V direction
- * @param {*} Q - Points to fit
- * @param {*} p - Degree of curve in U direction (>= 1)
- * @param {*} q - Degree of curve in V direction (>= 1)
- * @param {*} n - Number of control points in U direction
- * @param {*} m - Number of control points in V direction
- * @returns 
+ * @param {Number} r - Number of points to be approximated in U direction
+ * @param {Number} s - Number of points to be approximated in V direction
+ * @param {Number[][][]} Q - Points to fit
+ * @param {Number} p - Degree of curve in U direction (>= 1)
+ * @param {Number} q - Degree of curve in V direction (>= 1)
+ * @param {Number} n - Number of control points in U direction
+ * @param {Number} m - Number of control points in V direction
+ * @param {Number[]} U - Array to store outut knot vector in U direction in
+ * @param {Number[]} V - Array to store output knot vector in V direction in
+ * @param {Number[][][]} P - Array to store output control points in
+ * @returns U, V, P
  */
-function globalSurfApproxFixednm(r, s, Q, p, q, n, m) {
+function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
+    console.log(r)
+    console.log(s)
 
-    var i, j, k, l, tmp_1, tmp_2, tmp_3, Rku, Ru, Rkv, Rv, R_tmp, n0p, nnp, elem2, elem3;
+    var i, j, k, l, tmp_1, Rku, Ru, Rkv, Rv, R_tmp, n0p, nnp, elem2, elem3;
     // const ud = (m + 1) / (n - q + 1);
     // const vd = (m + 1) / (n - q + 1);
 
-    const ub = [], vb = [], sol_u = [], sol_v = [];
+    const ub = [], vb = [], sol_u = {}, sol_v = {};
     
-
-    surfMeshParams(r, s, Q, ub, vb);
+    surfMeshParams(r - 1, s - 1, Q, ub, vb);
 
     // Compute knots U by Eqs. (9.68), (9.69)
-    const U = [];
-    computeKnots(r, p, n, U, ub);
+    // U = [];
+    computeKnots(r - 1, p, n, U, ub);
 
     // Compute knots V by Eqs. (9.68), (9.69)
-    const V = [];
-    computeKnots(s, q, m, V, vb);
+    // V = [];
+    computeKnots(s - 1, q, m, V, vb);
+    // n -= 1;
+    // m -= 1;
+    
+    
+
+    console.log(U);
+    console.log(ub);
+    console.log(V);
+    console.log(vb);
 
     
     // Compute Nu[][] and NTNu[][] using Eq. (9.66)
@@ -1103,69 +1163,125 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m) {
 
     const NuT = math.transpose(Nu);
     const NuTNu = math.multiply(NuT, Nu);
+
+    console.log(Nu)
+    console.log(NuT)
+    console.log(NuTNu)
     
     const indxu = [];
     LUDecomposition(NuTNu, NuTNu.length, p, indxu);
 
-    const tmp = [];
-    tmp.length = n + 1;
-    tmp.fill([]);
-    for (j = 0; j < tmp.length; j++) {
-        tmp[j].length = s + 1;
-        tmp[j].fill(0);
+    const dim = Q[0][0].length;
+    const tmp_fill = [];
+    for (i = 0; i < dim; i++) {
+        tmp_fill.push(0);
     }
 
+    const tmp = [];
+    // tmp.length = n + 1;
+    // tmp.fill([]);
+    for (j = 0; j < n + 1; j++) {
+        tmp.push([])
+        // tmp[j].length = s + 1;
+        for (k = 0; k < s + 1; k++) {
+            // tmp[j][k] = [...tmp_fill];
+            tmp[j].push([...tmp_fill]);
+        }
+    }
+
+    const r_ = r - 1;
+
     // Fit in u direction
-    for (j = 0; j <= s; j++) {
-        tmp[0][j] = Q[0][j];
-        tmp[n][j] = Q[r][j];
+    for (j = 0; j < s; j++) {
+        tmp[0][j] = [...Q[0][j]];
+        tmp[n][j] = [...Q[r_][j]];
 
         // Compute and load Ru[] (Eqs. [9.63] and [9.67])
         // Compute Rku (Eq. 9.63)
         Rku = [];
-        for (i = 1; i < r - 1; i++) {
+        for (i = 1; i < r; i++) {
             n0p = calcBasisFuncOne(p, U, 0, ub[i]);
             nnp = calcBasisFuncOne(p, U, n, ub[i]);
-            elem2 = [Q[0][j][0] * n0p, Q[0][j][1] * n0p, Q[0][j][2] * n0p];
-            elem3 = [Q[r][j][0] * nnp, Q[r][j][1] * nnp, Q[r][j][2] * nnp];
-            Rku.push([Q[i][j][0] - elem2[0] - elem3[0], Q[i][j][1] - elem2[1] - elem3[1], Q[i][j][2] - elem2[2] - elem3[2]])
+            elem2 = [];
+            elem3 = [];
+            Rku.push([]);
+            for (k = 0; k < dim; k++) {
+                elem2.push(tmp[0][j][k] * n0p);
+                elem3.push(tmp[n][j][0] * nnp);
+                Rku[Rku.length - 1].push(Q[i][j][k] - elem2[k] - elem3[k]);
+            }
         }
 
         // Compute Ru (Eq. 9.67)
+        // Ru = [];
+        // Ru.length = n;
+        // Ru.fill([]);
+        // // for (i = 1; i < n; i++) {
+        // //     Ru[i].length = dim;
+        // //     Ru[i].fill(0);
+        // // }
+        // for (i = 1; i < n; i++) {
+        //     Ru[i].length = dim;
+        //     Ru[i].fill(0);
+            
+        //     R_tmp = [];
+        //     for (k = 0; k < Rku.length; k++) {
+        //         tmp_1 = calcBasisFuncOne(p, U, i, ub[k + 1]);
+        //         R_tmp.push([]);
+        //         for (l = 0; l < dim; l++)
+        //             R_tmp[R_tmp.length - 1].push(Rku[k][l] * tmp_1);
+        //     }
+        //     for (k = 0; k < dim; k++) {
+        //         for (l = 0; l < R_tmp.length; l++) {
+        //             Ru[i - 1][k] += R_tmp[l][k];
+        //         }
+        //     }
+        // }
         Ru = [];
-        Ru.length = Q[0][0].length;
-        Ru.fill([]);
-        for (i = 0; i < Q[0][0].length; i++) {
-            Ru[i].length = n - 1;
-            Ru[i].fill(0);
-        }
         for (i = 1; i < n; i++) {
-            R_tmp = [];
-            for (k = 0; k < Rku.length; k++) {
-                tmp_1 = calcBasisFuncOne(p, U, i, ub[k + 1]);
-                R_tmp.append([[Rku[i][0] * tmp_1, Rku[i][1] * tmp_1, Rku[i][2] * tmp_1]]);
+            Ru.push([]);
+            for (l = 0; l < dim; l++) {
+                Ru[Ru.length - 1].push(0);
             }
-            for (k = 0; k < Q[0][0].length; k++) {
-                for (l = 0; l < R_tmp.length; l++) {
-                    Ru[i - 1][k] += R_tmp[l][k];
+            for (k = 0; k < Rku.length; k++) {
+                for (l = 0; l < dim; l++) {
+                    Ru[i - 1][l] += Rku[k][l] * Nu[k][i - 1];
                 }
             }
         }
-        
+
         // Call ForwardBackward() to get intermediate control points
         // tmp[1][j], ..., tmp[n-1][j];
-        for (i = 0; i < Q[0][0].length; i++) {
+        for (i = 0; i < dim; i++) {
             tmp_1 = [];
             for (k = 0; k < Ru.length; k++) {
                 tmp_1.push(Ru[k][i]);
             }
 
             ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
+            console.log(sol_u)
             for (k = 1; k < n; k++) {
-                tmp[k][j][i] = tmp_1[k - 1];
+                tmp[k][j][i] = sol_u.sol[k - 1];
             }
         }
+        // console.log(tmp)
+        // tmp_1 = [];
+        // for (k = 0; k < Ru.length; k++) {
+        //     for (i = 0; i < dim; i++) {
+        //         tmp_1.push(Ru[k][i]);
+        //     }
+        // }
+        // for (k = 1; k < n; k++) {
+        //     tmp[k][j] = [];
+        //     ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
+        //     console.log(sol_u.sol)
+        //     // console.log(sol_u)
+        //     for (i = 0; i < dim; i++) {
+        //         tmp[k][j][i] = sol_u.sol[k - 1];
+        //     }
+        // }
     }
+    console.log(tmp)
 
 
 
@@ -1180,70 +1296,128 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m) {
     LUDecomposition(NvTNv, NvTNv.length, q, indxv);
 
     const ctrlPts = [];
-    ctrlPts.length = n + 1;
-    ctrlPts.fill([]);
-    for (j = 0; j < tmp.length; j++) {
-        ctrlPts[j].length = m + 1;
-        ctrlPts[j].fill(0);
+    // ctrlPts.length = n + 1;
+    // ctrlPts.fill([]);
+    for (j = 0; j < n + 1; j++) {
+        // ctrlPts[j].length = m + 1;
+        ctrlPts.push([]);
+        for (k = 0; k < m + 1; k++) {
+            ctrlPts[j].push([...tmp_fill]);
+            // ctrlPts[j][k] = [...tmp_fill];
+        }
+        // console.log(ctrlPts[j])
+        // console.log(tmp_fill)
     }
 
+    // const m_ = m - 1;
+    const s_ = s - 1;
+    
+    // console.log(ctrlPts)
     // Fit in v direction
     for (j = 0; j <= n; j++) {
-        ctrlPts[j][0] = tmp[j][0];
-        ctrlPts[j][m] = tmp[j][s];
+        ctrlPts[j][0] = [...tmp[j][0]];
+        ctrlPts[j][m] = [...tmp[j][s_]];
 
         // Compute and load Rv[] (Eqs. [9.63] and [9.67])
         // Compute Rkv (Eq. 9.63)
         Rkv = [];
         for (i = 1; i < m; i++) {
-            n0p = calcBasisFuncOne(p, U, 0, ub[i]);
-            nnp = calcBasisFuncOne(p, U, m, ub[i]);
-            elem2 = [tmp[0][j][0] * n0p, tmp[0][j][1] * n0p, tmp[0][j][2] * n0p];
-            elem3 = [tmp[r][j][0] * nnp, tmp[r][j][1] * nnp, tmp[r][j][2] * nnp];
-            Rkv.push([tmp[i][j][0] - elem2[0] - elem3[0], tmp[i][j][1] - elem2[1] - elem3[1], tmp[i][j][2] - elem2[2] - elem3[2]])
+            n0p = calcBasisFuncOne(q, V, 0, vb[i]);
+            nnp = calcBasisFuncOne(q, V, m, vb[i]);
+            elem2 = [];
+            elem3 = [];
+            Rkv.push([]);
+            for (k = 0; k < dim; k++) {
+                elem2.push(tmp[j][0][k] * n0p);
+                elem3.push(tmp[j][s_][k] * nnp);
+                Rkv[Rkv.length - 1].push(tmp[i][j][k] - elem2[k] - elem3[k]);
+            }
         }
 
         // Compute Rv (Eq. 9.67)
-        Rv = [];
-        Rv.length = Q[0][0].length;
-        Rv.fill([]);
-        for (i = 0; i < Q[0][0].length; i++) {
-            Rv[i].length = m - 1;
-            Rv[i].fill(0);
-        }
+        // Rv = [];
+        // Rv.length = m;
+        // Rv.fill([]);
+        // for (i = 0; i < m; i++) {
+        //     Rv[i].length = dim;
+        //     Rv[i].fill(0);
+        // }
 
+        // for (i = 1; i < m; i++) {
+        //     R_tmp = [];
+        //     for (k = 0; k < Rkv.length; k++) {
+        //         tmp_1 = calcBasisFuncOne(q, V, i, vb[k + 1]);
+        //         R_tmp.push([]);
+        //         for (l = 0; l < dim; l++)
+        //             R_tmp[R_tmp.length - 1].push(Rkv[k][l] * tmp_1);
+        //     }
+        //     for (k = 0; k < dim; k++) {
+        //         for (l = 0; l < R_tmp.length; l++) {
+        //             Rv[i - 1][k] += R_tmp[l][k];
+        //         }
+        //     }
+        // }
+        Rv = [];
         for (i = 1; i < m; i++) {
-            R_tmp = [];
-            for (k = 0; k < Rkv.length; k++) {
-                tmp_1 = calcBasisFuncOne(q, V, i, vb[k + 1]);
-                R_tmp.append([[Rkv[i][0] * tmp_1, Rkv[i][1] * tmp_1, Rkv[i][2] * tmp_1]]);
+            Rv.push([]);
+            for (l = 0; l < dim; l++) {
+                Rv[Rv.length - 1].push(0);
             }
-            for (k = 0; k < Q[0][0].length; k++) {
-                for (l = 0; l < R_tmp.length; l++) {
-                    Rv[i - 1][k] += R_tmp[l][k];
+            for (k = 0; k < Rkv.length; k++) {
+                for (l = 0; l < dim; l++) {
+                    Rv[i - 1][l] += Rkv[k][l] * Nv[k][i - 1];
                 }
             }
         }
         
         // Call ForwardBackward() to get intermediate control points
         // tmp[1][j], ..., tmp[n-1][j];
-        for (i = 0; i < Q[0][0].length; i++) {
+        for (i = 0; i < dim; i++) {
             tmp_1 = [];
             for (k = 0; k < Rv.length; k++) {
                 tmp_1.push(Rv[k][i]);
             }
 
             ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
-            for (k = 1; k < n; k++) {
-                ctrlPts[k][j][i] = tmp_1[k - 1];
+            console.log(sol_v)
+            for (k = 1; k < m; k++) {
+                ctrlPts[j][k][i] = sol_v.sol[k - 1];
             }
         }
+        // tmp_1 = [];
+        // for (k = 0; k < Rv.length; k++) {
+        //     for (i = 0; i < dim; i++) {
+        //         tmp_1.push(Rv[k][i]);
+        //     }
+        // }
+        // for (k = 1; k < m; k++) {
+        //     ctrlPts[j][k] = [];
+        //     ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
+        //     console.log(sol_v);Z
+        //     for (i = 0; i < dim; i++) {
+        //         ctrlPts[j][k][i] = sol_v.sol[k - 1];
+        //     }
+        // }
     }
 
-    const P = ctrlPts;
+    P.push(ctrlPts);
 
+    console.log(ctrlPts)
+// console.log(U, V);
 
     return U, V, P;
+}
+
+
+// Scale the NURBS by control points
+function scaleNURBSSurface(scaleFactor, nurbsParams, nurbsPos) {
+    nurbsParams.ctrlPts.forEach((point) => {
+        point.x = (point.x - nurbsPos.x) * scaleFactor + nurbsPos.x;
+        point.y = (point.y - nurbsPos.y) * scaleFactor + nurbsPos.y;
+        point.z = (point.z - nurbsPos.z) * scaleFactor + nurbsPos.z;
+        // Leave weights alone
+    })
+    return nurbsParams;
 }
 
 
@@ -1263,5 +1437,6 @@ export {
     distance3D,
     LUDecomposition,
     ForwardBackward,
-    globalSurfApproxFixednm
+    globalSurfApproxFixednm,
+    scaleNURBSSurface
 };
