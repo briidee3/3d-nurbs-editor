@@ -62,6 +62,7 @@ export default (env, argv) => {
                 patterns: [
                     { from: 'src/img', to: 'img', noErrorOnMissing: false },
                     { from: 'src/utils', to: 'utils', noErrorOnMissing: false },
+                    { from: 'src/test', to: 'test', noErrorOnMissing: false },
                     { from: 'src/app/manifest', to: 'simulator/manifest', noErrorOnMissing: true },
                     { from: 'locales', to: 'locales', noErrorOnMissing: true },
                     { from: 'LICENSE', to: '', noErrorOnMissing: true },
