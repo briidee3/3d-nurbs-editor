@@ -11,7 +11,7 @@ import { NURBSSurface } from 'three/addons/curves/NURBSSurface.js';
 import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
 import BasicScene from './BasicScene.js';
 import { calcBasisFunctionDerivatives, findSpan, calcKoverI, calcBasisFunctions } from 'three/examples/jsm/curves/NURBSUtils.js';
-import { max } from 'three/src/nodes/math/MathNode.js';
+import { distance, max } from 'three/src/nodes/math/MathNode.js';
 import { int } from 'three/tsl';
 import * as math from 'mathjs';
 import { exponentialHeightFogFactor } from 'three/tsl';
@@ -768,6 +768,7 @@ function LUDecomposition(A, q, sbw, indx) {
     // get both s.t. diag is 1s then store in A
     // that's all she wrote
 
+                // tmp[k][j][i] = sol_u[j][k - 1][i];
     // is good that is O(n^2) b/c Gaussian elimination is O(n^3) also triangular matrices are generally more efficient to work with a lot of the time and so decomposing a regular ol matrix into a couple of 3-agons is bestest for optimizinations (hence its use by TNB, hence its use here, hence my consequent illumination on various highly consequential matters of ALAFF advanced linear algebra foundations to frontiers (Geijn, Myers, 19xx/20xx) anyways yehaw im gonna go take a nap adios for now)
 
     // var sbw_ = sbw;
@@ -852,6 +853,7 @@ function LUDecomposition(A, q, sbw, indx) {
         // delete vv;
     }
     console.log(A);
+    console.log(d)
 
     return d;
 
@@ -897,6 +899,124 @@ function ForwardBackward(A, q, sbw, rhs, sol_, indx) {
 }
 
 
+
+// Solve from https://numerical.recipes/book.html 2.3
+/**
+ * 
+ * @param {*} lu - LU decomposerd matrix
+ * @param {*} b - RHS
+ * @param {*} x - Sol
+ * @param {*} n - Size
+ * @param {*} indx - Permutation indices
+ */
+function solveLURow(lu, b, x, n, indx) {
+    var i, ii = 0, ip, j, sum;
+
+
+    if (b.length != n || x.length != n) {
+        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}`);
+    }
+    for (i = 0; i < n; i++) x[i] = b[i];
+    // When ii > 0, will beocome index of first nonvanishing element of b. now doing forward substitution
+    for (i = 0; i < n; i++) {
+        ip = indx[i];
+        sum = x[ip];
+        x[ip] = x[i];
+        if (ii != 0)
+            for (j = ii - 1; j < i; j++) sum -= lu[i][j] * x[j];
+        else if (sum != 0)  // Nonzero element encountered
+            ii = i + 1;
+        x[i] = sum;
+    }
+    // Now backward substitution
+    for (i = n - 1; i >= 0; i--) {
+        sum = x[i];
+        for (j = i + 1; j < n; j++) sum -= lu[i][j] * x[j];
+        // console.log(sum)
+        x[i] = sum / lu[i][i]   // store compoonent of solution vector
+        // console.log(lu[i][i])
+    }
+
+    // done
+}
+
+// Solve m sets of n linear equations using sstored LU decomp of A. b matrix for rhs, x matrix for solution.
+// b and x may recference the same matrix, in which case the solution overwrites the input.
+//https://numerical.recipes/book.html
+function solveLU(lu, b, x, n, indx) {
+    // console.log(b)
+    var i, j, m = b[0].length;
+    if (b.length != n || x.length != n || b.length != x.length)
+        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}`);
+    
+    // I think this is right?
+    const xx = [];
+    for (i = 0; i < n; i++) {
+        xx.push(0);
+    }
+
+    // Copy and solve each column
+    for (j = 0; j < m; j++) {
+        for (i = 0; i < n; i++) xx[i] = b[i][j];
+        // solveLURow(lu, xx, xx, n, indx);
+        for (i = 0; i < n; i++) x[i][j] = xx[i];
+    }
+}
+
+
+
+//https://numerical.recipes/book.html
+// LU decomposition 
+function LUdcmp(lu, indx) {
+    // const tiny = 1 * 10**-40;   // v small num
+    const tiny = 0;   // v small num
+    const n = lu.length;
+    
+    var i, imax, j, k, big, temp, vv = [], d;
+    vv.length = n; vv.fill(0);
+    d = 1;
+    for (i = 0; i < n; i++) {
+        big = 0;
+        for (j = 0; j < n; j++)
+            if ((temp = Math.abs(lu[i][j])) > big) big = temp;
+        if (big == 0) throw new Error("Singular matrix in LUdcmp");
+        // No nonzero largest element
+        vv[i] = 1 / big;    // save scaling
+    }
+    for (k = 0; k < n; k++) {
+        big = 0;
+        imax = k;
+        for (i = k; i < n; i++) {
+            temp = vv[i] * Math.abs(lu[i][k]);
+            if (temp > big) {   // Is best pivot so far?
+                big = temp;
+                imax = i;
+            }
+        }
+        if (k != imax) {    // Need to interchange rows?
+            for (j = 0; j < n; j++) {
+                temp = lu[imax][j];
+                lu[imax][j] = lu[k][j];
+                lu[k][j] = temp;
+            }
+            d = -d;
+            vv[imax] = vv[k];
+        }
+        indx[k] = imax;
+        if (lu[k][k] == 0) lu[k][k] = tiny; // if pivot is 0, matrix is singular. sometimes is good for tiny to be 0
+        for (i = k + 1; i < n; i++) {
+            temp = lu[i][k] /= lu[k][k];    // divide by pivot
+            for (j = k + 1; j < n; j++) 
+                lu[i][j] -= temp * lu[k][j];
+        }
+    }
+    console.log(d);
+
+    return d;
+}
+
+
+
 // 3D distance
 function distance3D(p1, p2, asArray = true) {
 
@@ -925,39 +1045,56 @@ function distance3D(p1, p2, asArray = true) {
  * @param {*} vl - Output for vl
  */
 function surfMeshParams(n, m, Q, uk, vl) {
+
     // n -= 1;
     // m -= 1;
 
+    // uk.length = n + 1;
+    uk.length = n + 1;
+    uk.fill(0)
+    // vl.length = m;
+    vl.length = m + 1;
+    vl.fill(0)
+
     var num = m + 1;    // Num of nondegenerate rows
     uk[0] = 0; uk[n] = 1;
-    vl[0] = 0; vl[n] = 1;
+    // uk[0] = 0; uk[n - 1] = 1;
+    vl[0] = 0; vl[m] = 1;
+    // vl[0] = 0; vl[m - 1] = 1;
     var k, l, d;
     var total;
 
     // Create and fill empty array for holding tmp vals
-    const cds = [];
-    cds.length = n + 1;
-    cds.fill(0);
+    const cds_u = [], cds_v = [];
+    // cds.length = n + 1;
+    // cds.length = math.max(n + 1, m + 1);
+    // cds.length = math.max(n, m);
+    cds_u.length = n+1;
+    cds_u.fill(0);
 
-    // Initialize out vecs
-    for (k = 1; k < n; k++) {
-        uk[k] = 0;
-        vl[k] = 0;
-    }
+    // // Initialize out vecs
+    // for (k = 1; k < n - 1; k++) {
+    //     uk[k] = 0;
+    //     vl[k] = 0;
+    // }
+    console.log(Q)
 
 
     // Handle uk
-    for (l = 0; l <= m; l++) {
+    // for (l = 0; l <= m; l++) {
+    for (l = 0; l < m; l++) {
         total = 0; // total chord length of row
-        for (k = 1; k <= n; k++) {
-            cds[k] = distance3D(Q[k][l], Q[k-1][l]);
-            total += cds[k];
+        for (k = 1; k < n ; k++) {
+        // for (k = 1; k <= n; k++) {
+            cds_u[k] = distance3D(Q[k][l], Q[k-1][l]);
+            total += cds_u[k];
         }
         if (total == 0) num -= 1;
         else {
             d = 0;
+            // for (k = 1; k < n - 1; k++) {
             for (k = 1; k < n; k++) {
-                d += cds[k];
+                d += cds_u[k];
                 uk[k] += d / total;
             }
         }
@@ -966,31 +1103,65 @@ function surfMeshParams(n, m, Q, uk, vl) {
         console.error("0 nondegenerate rows in surfMeshParams()");
         return -1;
     }
+    // for (k = 1; k < n - 1; k++) uk[k] /= num;
     for (k = 1; k < n; k++) uk[k] /= num;
 
-    num = n + 1;
 
-    // Handle vl
-    for (k = 0; k <= m; k++) {
-        total = 0; // total chord length of column
-        for (l = 1; l <= n; l++) {
-            cds[l] = distance3D(Q[k][l], Q[k][l - 1]);
-            total += cds[l];
+
+    // num = n + 1;
+
+    // // Handle vl
+    // // for (k = 0; k < m; k++) {
+    // for (k = 0; k < n; k++) {
+    //     total = 0; // total chord length of column
+    //     // for (l = 1; l < n - 1; l++) {
+    //     for (l = 1; l < m - 1; l++) {
+    //         cds[l] = distance3D(Q[k][l], Q[k][l - 1]);
+    //         total += cds[l];
+    //     }
+    //     if (total == 0) num -= 1;
+    //     else {
+    //         d = 0;
+    //         for (l = 1; l < n; l++) {
+    //             d += cds[l];
+    //             vl[l] += d / total;
+    //         }
+    //     }
+    // }
+    // if (num == 0) {
+    //     console.error("0 nondegenerate rows in surfMeshParams()");
+    //     return -1;
+    // }
+    // for (l = 1; l < n; l++) vl[l] /= num;
+
+
+    num = n + 1;
+    cds_v.length = m + 1;
+    cds_v.fill(0);
+
+    // for (l = 0; l <= n; l++) {
+    for (l = 0; l < n; l++) {
+        total = 0;
+        for (k = 1; k < m; k++) {
+        // for (k = 1; k <= m; k++) {
+            // cds_v[k] = distance3D(Q[k][l], Q[k - 1][l]);
+            cds_v[k] = distance3D(Q[l][k], Q[l][k - 1]);
+            total += cds_v[k]
         }
         if (total == 0) num -= 1;
         else {
             d = 0;
-            for (l = 1; l < n; l++) {
-                d += cds[l];
-                vl[l] += d / total;
+            for (k = 1; k < m; k++) {
+                d += cds_v[k];
+                vl[k] += d / total;
             }
         }
-    }
+    }    
     if (num == 0) {
-        console.error("0 nondegenerate rows in surfMeshParams()");
+        console.error("0 nondegenerate cols in surfMeshParams()");
         return -1;
     }
-    for (l = 1; l < n; l++) vl[l] /= num;
+    for (k = 1; k < m; k++) vl[k] /= num;
 }
 
 
@@ -1009,6 +1180,7 @@ function computeKnots(numPts, deg, numCtrlPts, U, ub) {
     const d = (numPts) / (numCtrlPts - deg);
 
     // Initialize with all zeros
+    // U.length = deg + 1;
     U.length = deg + 1;
     U.fill(0);
 
@@ -1073,6 +1245,8 @@ function calcBasisFuncOne(p, U, i, u) {
         }
     }
 
+    // console.log(N)
+
     return N[0];
 }
 
@@ -1093,9 +1267,11 @@ function computeN(p, n, r, N, U, ub) {
     // }
     
 
-    for (i = 1; i < r; i++) {
+    // for (i = 1; i < r; i++) {
+    for (i = 1; i < n; i++) {
         m_tmp = [];
-        for (j = 1; j < n; j++) {
+        // for (j = 1; j < n; j++) {
+        for (j = 1; j < r; j++) {
             m_tmp.push(calcBasisFuncOne(p, U, j, ub[i]));
         }
         // console.log(m_tmp);
@@ -1105,6 +1281,40 @@ function computeN(p, n, r, N, U, ub) {
     // console.log(N);
 
     return N;
+}
+
+
+
+// TNB 9.63
+// Fr least squares curve approximation
+/**
+ * 
+ * @param {*} dataPts - Data points being fit by curve
+ * @param {*} ub 
+//  * @param {*} N - pre-computed N matrix (9.66)
+ * @param {*} Rku - output vector. assumed to be initially an empty array.
+ */
+function computeRku(deg, dataPts, Rku, ub) {
+    // k \in 1, ..., m - 1
+    // const m = dataPts.length;
+    
+    var k, i, a, b;
+    const dim = dataPts[0].length;
+    const filler = [];
+    for (i = 0; i < dim; i++) filler.push(0);
+
+    for (k = 1; k < dataPts.length - 1; k++) {
+        a = calcBasisFuncOne(deg, U, 0, ub[k]);
+        b = calcBasisFuncOne(deg, U, n, ub[k]);
+        Rku.push([...filler])
+
+        for (i = 0; i < dim; i++) {
+            // Rku[k - 1][i] = dataPts[k][i] - a * dataPts[0][i] - b * dataPts[dataPts.length][i];
+            Rku[k - 1][i] = dataPts[k][i] - a * dataPts[0][i] - b * dataPts[dataPts.length][i];
+        }
+    }
+
+    return Rku;
 }
 
 
@@ -1131,23 +1341,56 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     console.log(r)
     console.log(s)
 
+    // n -= 1;
+    // m -= 1;
+    // r -= 1;
+    // s -= 1;
+
     var i, j, k, l, tmp_1, Rku, Ru, Rkv, Rv, R_tmp, n0p, nnp, elem2, elem3;
     // const ud = (m + 1) / (n - q + 1);
     // const vd = (m + 1) / (n - q + 1);
 
-    const ub = [], vb = [], sol_u = {}, sol_v = {};
+    const ub = [], vb = [];
     
-    surfMeshParams(r - 1, s - 1, Q, ub, vb);
+    surfMeshParams(r, s, Q, ub, vb);
 
     // Compute knots U by Eqs. (9.68), (9.69)
     // U = [];
-    computeKnots(r - 1, p, n, U, ub);
+    computeKnots(r, p, n, U, ub);
+    // computeKnots(r, p, n + 1, U, ub);
 
     // Compute knots V by Eqs. (9.68), (9.69)
     // V = [];
-    computeKnots(s - 1, q, m, V, vb);
+    computeKnots(s, q, m, V, vb);
+    // computeKnots(s, q, m + 1, V, vb);
     // n -= 1;
     // m -= 1;
+    // const r_ = r - 1;
+    // const s_ = s - 1;
+
+
+    const r_ = r;
+    const s_ = s;
+
+    const dim = Q[0][0].length;
+    const tmp_fill = [];
+    for (i = 0; i < dim; i++) {
+        tmp_fill.push(0);
+    }
+
+    const tmp = [];
+    // tmp.length = n + 1;
+    // tmp.fill([]);
+    // for (j = 0; j < n + 1; j++) {
+    for (j = 0; j < n; j++) {
+        tmp.push([])
+        // tmp[j].length = s + 1;
+        // for (k = 0; k < s + 1; k++) {
+        for (k = 0; k < s; k++) {
+            // tmp[j][k] = [...tmp_fill];
+            tmp[j].push([...tmp_fill]);
+        }
+    }
     
     
 
@@ -1159,7 +1402,8 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     
     // Compute Nu[][] and NTNu[][] using Eq. (9.66)
     const Nu = [];
-    computeN(p, n, r, Nu, U, ub)
+    // computeN(p, n, r, Nu, U, ub)
+    computeN(p, n, r, Nu, U, ub)    // previously subbed 1 from n and r
 
     const NuT = math.transpose(Nu);
     const NuTNu = math.multiply(NuT, Nu);
@@ -1168,49 +1412,69 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     console.log(NuT)
     console.log(NuTNu)
     
-    const indxu = [];
-    LUDecomposition(NuTNu, NuTNu.length, p, indxu);
+    const indxu = [], rhsu = [], sol_u = [];
 
-    const dim = Q[0][0].length;
-    const tmp_fill = [];
-    for (i = 0; i < dim; i++) {
-        tmp_fill.push(0);
-    }
-
-    const tmp = [];
-    // tmp.length = n + 1;
-    // tmp.fill([]);
-    for (j = 0; j < n + 1; j++) {
-        tmp.push([])
-        // tmp[j].length = s + 1;
-        for (k = 0; k < s + 1; k++) {
-            // tmp[j][k] = [...tmp_fill];
-            tmp[j].push([...tmp_fill]);
+    // for (i = 0; i < NuTNu.length; i++) {
+    for (i = 0; i < s; i++) {
+        rhsu.push([]);
+        sol_u.push([]);
+        indxu.push(0);
+        // for (j = 0; j < NuTNu[0].length; j++) {
+        for (j = 0; j < NuTNu.length; j++) {
+            // rhsu[i].push(0);
+            // sol_u[i].push(0);
+            rhsu[i].push([...tmp_fill]);
+            sol_u[i].push([...tmp_fill]);
+            // indxu[i].push(0);
         }
     }
 
-    const r_ = r - 1;
+
+
+    // LUDecomposition(NuTNu, NuTNu.length, p, indxu);
+    // LUDecomposition(NuTNu, n - 1, p, indxu);
+    // LUDecomposition(NuTNu, n - 1, p, indxu);
+    const d = LUdcmp(NuTNu, indxu);
+    console.log(NuTNu)
+    console.log(indxu)
+
 
     // Fit in u direction
     for (j = 0; j < s; j++) {
+    // for (j = 0; j <= s; j++) {
         tmp[0][j] = [...Q[0][j]];
-        tmp[n][j] = [...Q[r_][j]];
+        // tmp[n][j] = [...Q[r_][j]];
+        tmp[n - 1][j] = [...Q[r_ - 1][j]];
 
         // Compute and load Ru[] (Eqs. [9.63] and [9.67])
         // Compute Rku (Eq. 9.63)
         Rku = [];
+        // for (i = 1; i < r + 1; i++) {   // r+1 when previously subtracting 1 from r
         for (i = 1; i < r; i++) {
+        // for (i = 1; i < r - 1; i++) {
             n0p = calcBasisFuncOne(p, U, 0, ub[i]);
-            nnp = calcBasisFuncOne(p, U, n, ub[i]);
+            // nnp = calcBasisFuncOne(p, U, n, ub[i]);
+            nnp = calcBasisFuncOne(p, U, n - 1, ub[i]);
+            // console.log(n0p)
+            // console.log(nnp)
             elem2 = [];
             elem3 = [];
-            Rku.push([]);
+            Rku.push([...tmp_fill]);
             for (k = 0; k < dim; k++) {
-                elem2.push(tmp[0][j][k] * n0p);
-                elem3.push(tmp[n][j][0] * nnp);
-                Rku[Rku.length - 1].push(Q[i][j][k] - elem2[k] - elem3[k]);
+                // elem2.push(tmp[0][j][k] * n0p);
+                elem2.push(Q[0][j][k] * n0p);
+                // elem3.push(tmp[n][j][0] * nnp);
+                // elem3.push(tmp[n - 1][j][0] * nnp);
+                elem3.push(Q[r - 1][j][0] * nnp);
+                Rku[i - 1][k] = Q[i][j][k] - elem2[k] - elem3[k];
             }
+            // for (k = 0; k < dim; k++) {
+            //     Rku[i - 1][k] = Q[i][k] - n0p * Q[0][k] - nnp * Q[Q.length - 1][k];
+            // }
         }
+        console.log(Rku);
+
+        // computeRku(P, Q[i][j])
 
         // Compute Ru (Eq. 9.67)
         // Ru = [];
@@ -1239,69 +1503,254 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         // }
         Ru = [];
         for (i = 1; i < n; i++) {
-            Ru.push([]);
-            for (l = 0; l < dim; l++) {
-                Ru[Ru.length - 1].push(0);
-            }
+        // for (i = 1; i < n - 1; i++) {
+            // Ru.push([]);
+            // for (l = 0; l < dim; l++) {
+            //     Ru[Ru.length - 1].push(0);
+            // }
+            Ru.push([...tmp_fill]);
+            R_tmp = [];
             for (k = 0; k < Rku.length; k++) {
+                tmp_1 = calcBasisFuncOne(p, U, i, ub[k + 1]);
+                R_tmp.push([])
                 for (l = 0; l < dim; l++) {
-                    Ru[i - 1][l] += Rku[k][l] * Nu[k][i - 1];
+                    R_tmp[k].push(Rku[k][l] * tmp_1);
+                }
+            }                
+            for (l = 0; l < dim; l++) {
+                for (k = 0; k < R_tmp.length; k++) {
+                    Ru[i - 1][l] += R_tmp[k][l];
                 }
             }
+            // for (l = 0; l < dim; l++) {
+            //     // Ru[i - 1][l] += Rku[k][l] * Nu[k][i - 1];
+            //         Ru[i - 1][l] += Rku[k][l] * tmp_1;
+            // }
         }
+        console.log(Ru);
 
         // Call ForwardBackward() to get intermediate control points
         // tmp[1][j], ..., tmp[n-1][j];
-        for (i = 0; i < dim; i++) {
-            tmp_1 = [];
-            for (k = 0; k < Ru.length; k++) {
-                tmp_1.push(Ru[k][i]);
-            }
-
-            ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
-            console.log(sol_u)
-            for (k = 1; k < n; k++) {
-                tmp[k][j][i] = sol_u.sol[k - 1];
-            }
-        }
-        // console.log(tmp)
-        // tmp_1 = [];
-        // for (k = 0; k < Ru.length; k++) {
-        //     for (i = 0; i < dim; i++) {
+        // for (i = 0; i < dim; i++) {
+        //     tmp_1 = [];
+        //     for (k = 0; k < Ru.length; k++) {
         //         tmp_1.push(Ru[k][i]);
         //     }
-        // }
-        // for (k = 1; k < n; k++) {
-        //     tmp[k][j] = [];
+
         //     ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
-        //     console.log(sol_u.sol)
-        //     // console.log(sol_u)
-        //     for (i = 0; i < dim; i++) {
+        //     console.log(sol_u)
+        //     for (k = 1; k < n; k++) {
         //         tmp[k][j][i] = sol_u.sol[k - 1];
         //     }
         // }
-    }
-    console.log(tmp)
+        // console.log(tmp)
+        // rhsu[j] = [...tmp_fill];
+        // for (k = 0; k < Ru.length; k++) {
+        //     // rhsu[j].push([...Ru[k]]);
+        //     rhsu[j][k] = [...Ru[k]];
+        //     // rhsu[k][j] = [...Ru[k]];
+        //     // for (i = 0; i < dim; i++) {
+        //     //     // tmp_1.push(Ru[k][i]);
+        //     //     rhsu[j].push(Ru[k][i]);
+        //     // }
+        // }
+        // // for (k = 1; k < n; k++) {
+        // for (k = 1; k < n; k++) {
+        //     tmp[k][j] = [...tmp_fill];
+        //     // ForwardBackward(NuTNu, NuTNu.length, -1, tmp_1, sol_u, indxu);
+        //     // solveLURow(NuTNu, rhsu[j], sol_u[j], n - 1, indxu);
+        //     // solveLU(NuTNu, rhsu[j], sol_u[j], n - 1, indxu);
 
+        //     console.log(rhsu[j])
+        //     console.log(sol_u[j]);
+
+        //     for (i = 0; i < dim; i++) {
+        //         tmp_1 = [];
+        //         for (l = 0; l < rhsu[j].length; l++) tmp_1.push(rhsu[j][l][i]);
+        //         console.log(tmp_1);
+        //         solveLURow(NuTNu, tmp_1, sol_u[j], n - 1, indxu);
+        //         console.log(sol_u)
+        //         // tmp[k][j][i] = sol_u[j][k - 1][i];
+        //         tmp[k][j][i] = sol_u[j][k - 1];
+        //         // tmp[k][j] = [...sol_u[j][k - 1]];
+        //     }
+        // }
+
+        for (l = 0; l < dim; l++) {
+            tmp_1 = [];
+            for (k = 0; k < Ru.length; k++) {
+                tmp_1.push(Ru[k][l]);
+            }
+            solveLURow(NuTNu, tmp_1, sol_u[j], n - 1, indxu);
+            for (k = 1; k < n - 1; k++) {
+                tmp[k][j][l] = tmp_1[k - 1];
+            }
+            console.log(tmp_1)
+        }
+    }
+    // solveLU(NuTNu, rhsu, sol_u, n - 1, indxu);
+    // for (j = 0; j <= s; j++) {
+    //     for 
+    // }
+    console.log(tmp)
+    // return;
 
 
     // Compute Nv[][] and NvTNv[][] using Eq. (9.66)
+    // const Nv = [];
+    // computeN(q, m, s, Nv, V, vb)
+
+    // const NvT = math.transpose(Nv);
+    // const NvTNv = math.multiply(NvT, Nv);
+    
+    // const indxv = [], rhsv = [], sol_v = [];
+    // LUDecomposition(NvTNv, NvTNv.length, q, indxv);
+
+    // const ctrlPts = [];
+    // // ctrlPts.length = n + 1;
+    // // ctrlPts.fill([]);
+    // for (j = 0; j < n + 1; j++) {
+    //     // ctrlPts[j].length = m + 1;
+    //     ctrlPts.push([]);
+    //     for (k = 0; k < m + 1; k++) {
+    //         ctrlPts[j].push([...tmp_fill]);
+    //         // ctrlPts[j][k] = [...tmp_fill];
+    //     }
+    //     // console.log(ctrlPts[j])
+    //     // console.log(tmp_fill)
+    // }
+
+    // // const m_ = m - 1;
+    
+    // // console.log(ctrlPts)
+    // // Fit in v direction
+    // for (j = 0; j <= n; j++) {
+    //     ctrlPts[j][0] = [...tmp[j][0]];
+    //     ctrlPts[j][m] = [...tmp[j][s_]];
+
+    //     // Compute and load Rv[] (Eqs. [9.63] and [9.67])
+    //     // Compute Rkv (Eq. 9.63)
+    //     Rkv = [];
+    //     for (i = 1; i < m; i++) {
+    //         n0p = calcBasisFuncOne(q, V, 0, vb[i]);
+    //         nnp = calcBasisFuncOne(q, V, m, vb[i]);
+    //         elem2 = [];
+    //         elem3 = [];
+    //         Rkv.push([]);
+    //         for (k = 0; k < dim; k++) {
+    //             elem2.push(tmp[j][0][k] * n0p);
+    //             elem3.push(tmp[j][s_][k] * nnp);
+    //             Rkv[Rkv.length - 1].push(tmp[i][j][k] - elem2[k] - elem3[k]);
+    //         }
+    //     }
+
+    //     // Compute Rv (Eq. 9.67)
+    //     // Rv = [];
+    //     // Rv.length = m;
+    //     // Rv.fill([]);
+    //     // for (i = 0; i < m; i++) {
+    //     //     Rv[i].length = dim;
+    //     //     Rv[i].fill(0);
+    //     // }
+
+    //     // for (i = 1; i < m; i++) {
+    //     //     R_tmp = [];
+    //     //     for (k = 0; k < Rkv.length; k++) {
+    //     //         tmp_1 = calcBasisFuncOne(q, V, i, vb[k + 1]);
+    //     //         R_tmp.push([]);
+    //     //         for (l = 0; l < dim; l++)
+    //     //             R_tmp[R_tmp.length - 1].push(Rkv[k][l] * tmp_1);
+    //     //     }
+    //     //     for (k = 0; k < dim; k++) {
+    //     //         for (l = 0; l < R_tmp.length; l++) {
+    //     //             Rv[i - 1][k] += R_tmp[l][k];
+    //     //         }
+    //     //     }
+    //     // }
+    //     Rv = [];
+    //     for (i = 1; i < m; i++) {
+    //         Rv.push([]);
+    //         for (l = 0; l < dim; l++) {
+    //             Rv[Rv.length - 1].push(0);
+    //         }
+    //         for (k = 0; k < Rkv.length; k++) {
+    //             for (l = 0; l < dim; l++) {
+    //                 Rv[i - 1][l] += Rkv[k][l] * Nv[k][i - 1];
+    //             }
+    //         }
+    //     }
+        
+    //     // Call ForwardBackward() to get intermediate control points
+    //     // tmp[1][j], ..., tmp[n-1][j];
+    //     for (i = 0; i < dim; i++) {
+    //         tmp_1 = [];
+    //         for (k = 0; k < Rv.length; k++) {
+    //             tmp_1.push(Rv[k][i]);
+    //         }
+
+    //         ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
+    //         console.log(sol_v)
+    //         for (k = 1; k < m; k++) {
+    //             ctrlPts[j][k][i] = sol_v.sol[k - 1];
+    //         }
+    //     }
+    //     // tmp_1 = [];
+    //     // for (k = 0; k < Rv.length; k++) {
+    //     //     for (i = 0; i < dim; i++) {
+    //     //         tmp_1.push(Rv[k][i]);
+    //     //     }
+    //     // }
+    //     // for (k = 1; k < m; k++) {
+    //     //     ctrlPts[j][k] = [];
+    //     //     ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
+    //     //     console.log(sol_v);Z
+    //     //     for (i = 0; i < dim; i++) {
+    //     //         ctrlPts[j][k][i] = sol_v.sol[k - 1];
+    //     //     }
+    //     // }
+    // }
+
     const Nv = [];
     computeN(q, m, s, Nv, V, vb)
+    // computeN(q, m + 1, s + 1, Nv, V, vb)
 
     const NvT = math.transpose(Nv);
     const NvTNv = math.multiply(NvT, Nv);
+    console.log(Nv)
+    console.log(NvT)
     
-    const indxv = [];
-    LUDecomposition(NvTNv, NvTNv.length, q, indxv);
+    const indxv = [], rhsv = [], sol_v = [];
+    // LUDecomposition(NvTNv, NvTNv.length, q, indxv);
+
+    // for (i = 0; i < NuTNu.length; i++) {
+    for (i = 0; i <= r; i++) {
+        rhsv.push([]);
+        sol_v.push([]);
+        indxv.push(0);
+        // for (j = 0; j < NuTNu[0].length; j++) {
+        for (j = 0; j < NvTNv.length; j++) {
+            // rhsu[i].push(0);
+            // sol_u[i].push(0);
+            rhsv[i].push([...tmp_fill]);
+            sol_v[i].push([...tmp_fill]);
+            // indxu[i].push(0);
+        }
+    }
+    console.log(NvTNv)
+
+    const dv = LUdcmp(NvTNv, indxv);
+    console.log(NvTNv)
+
 
     const ctrlPts = [];
     // ctrlPts.length = n + 1;
     // ctrlPts.fill([]);
-    for (j = 0; j < n + 1; j++) {
+    // for (j = 0; j < n + 1; j++) {
+    for (j = 0; j < n; j++) {
         // ctrlPts[j].length = m + 1;
         ctrlPts.push([]);
-        for (k = 0; k < m + 1; k++) {
+        for (k = 0; k < m; k++) {
+        // for (k = 0; k < m + 1; k++) {
             ctrlPts[j].push([...tmp_fill]);
             // ctrlPts[j][k] = [...tmp_fill];
         }
@@ -1310,29 +1759,43 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     }
 
     // const m_ = m - 1;
-    const s_ = s - 1;
     
     // console.log(ctrlPts)
     // Fit in v direction
-    for (j = 0; j <= n; j++) {
+    // for (j = 0; j <= n; j++) {
+    for (j = 0; j < n; j++) {
         ctrlPts[j][0] = [...tmp[j][0]];
-        ctrlPts[j][m] = [...tmp[j][s_]];
+        // ctrlPts[j][m] = [...tmp[j][s_]];
+        ctrlPts[j][m - 1] = [...tmp[j][s_ - 1]];
 
         // Compute and load Rv[] (Eqs. [9.63] and [9.67])
         // Compute Rkv (Eq. 9.63)
         Rkv = [];
+        // for (i = 1; i < m; i++) {
+        // for (i = 1; i < m + 1; i++) {
         for (i = 1; i < m; i++) {
+        // for (i = 1; i < m - 1; i++) {
             n0p = calcBasisFuncOne(q, V, 0, vb[i]);
-            nnp = calcBasisFuncOne(q, V, m, vb[i]);
+            // nnp = calcBasisFuncOne(q, V, m, vb[i]);
+            nnp = calcBasisFuncOne(q, V, m - 1, vb[i]);
+            // console.log(n0p)
+            // console.log(nnp)
             elem2 = [];
             elem3 = [];
-            Rkv.push([]);
+            Rkv.push([...tmp_fill]);
             for (k = 0; k < dim; k++) {
                 elem2.push(tmp[j][0][k] * n0p);
-                elem3.push(tmp[j][s_][k] * nnp);
-                Rkv[Rkv.length - 1].push(tmp[i][j][k] - elem2[k] - elem3[k]);
+                elem3.push(tmp[j][s_ - 1][k] * nnp);
+                // elem3.push(tmp[j][s_ - 1][k] * nnp);
+                // Rkv[i - 1][k] = tmp[i][j][k] - elem2[k] - elem3[k];
+                // Rkv[i - 1][k] = tmp[j][i - 1][k] - elem2[k] - elem3[k];
+                Rkv[i - 1][k] = tmp[j][i][k] - elem2[k] - elem3[k];
+                // console.log(elem2)
+                // console.log(elem3)
+                // console.log(tmp[j][i][k])
             }
         }
+        console.log(Rkv);
 
         // Compute Rv (Eq. 9.67)
         // Rv = [];
@@ -1358,32 +1821,69 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         //     }
         // }
         Rv = [];
+        // for (i = 1; i < m; i++) {
+        // for (i = 1; i < m - 1; i++) {
+        //     Rv.push([...tmp_fill]);
+        //     // for (l = 0; l < dim; l++) {
+        //     //     Rv[Rv.length - 1].push(0);
+        //     // }
+        //     for (k = 0; k < Rkv.length; k++) {
+        //         for (l = 0; l < dim; l++) {
+        //             Rv[i - 1][l] += Rkv[k][l] * Nv[k][i - 1];
+        //         }
+        //     }
+        // }
+        // for (i = 1; i < m - 1; i++) {
         for (i = 1; i < m; i++) {
-            Rv.push([]);
-            for (l = 0; l < dim; l++) {
-                Rv[Rv.length - 1].push(0);
-            }
+            Rv.push([...tmp_fill]);
+            R_tmp = [];
             for (k = 0; k < Rkv.length; k++) {
+                tmp_1 = calcBasisFuncOne(q, V, i, vb[k + 1]);
+                // R_tmp.push([...tmp_fill]);
+                R_tmp.push([]);
                 for (l = 0; l < dim; l++) {
-                    Rv[i - 1][l] += Rkv[k][l] * Nv[k][i - 1];
+                    // R_tmp[k] = Rkv[k][l] * tmp_1;
+                    R_tmp[k].push(Rkv[k][l] * tmp_1);
                 }
+            }
+            for (l = 0; l < dim; l++) {
+                for (k = 0; k < R_tmp.length; k++) {
+                    Rv[i - 1][l] += R_tmp[k][l];
+                }
+            }
+        }
+        console.log(Rv);
+
+
+        for (l = 0; l < dim; l++) {
+            tmp_1 = [];
+            for (k = 0; k < Rv.length; k++) {
+                tmp_1.push(Rv[k][l]);
+            }
+            solveLURow(NvTNv, tmp_1, sol_v[j], m - 1, indxv);
+            console.log(tmp_1)
+            for (k = 1; k < m - 1; k++) {
+                // ctrlPts[j][i][l] = tmp_1[k - 1];
+                ctrlPts[j][k][l] = tmp_1[k - 1];
             }
         }
         
         // Call ForwardBackward() to get intermediate control points
         // tmp[1][j], ..., tmp[n-1][j];
-        for (i = 0; i < dim; i++) {
-            tmp_1 = [];
-            for (k = 0; k < Rv.length; k++) {
-                tmp_1.push(Rv[k][i]);
-            }
 
-            ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
-            console.log(sol_v)
-            for (k = 1; k < m; k++) {
-                ctrlPts[j][k][i] = sol_v.sol[k - 1];
-            }
-        }
+        // for (i = 0; i < dim; i++) {
+        //     tmp_1 = [];
+        //     for (k = 0; k < Rv.length; k++) {
+        //         tmp_1.push(Rv[k][i]);
+        //     }
+
+        //     ForwardBackward(NvTNv, NvTNv.length, -1, tmp_1, sol_v, indxv);
+        //     console.log(sol_v)
+        //     for (k = 1; k < m; k++) {
+        //         ctrlPts[j][k][i] = sol_v.sol[k - 1];
+        //     }
+        // }
+
         // tmp_1 = [];
         // for (k = 0; k < Rv.length; k++) {
         //     for (i = 0; i < dim; i++) {
@@ -1398,6 +1898,35 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         //         ctrlPts[j][k][i] = sol_v.sol[k - 1];
         //     }
         // }
+
+        for (k = 0; k < Rv.length; k++) {
+            rhsv[j][k] = [...Rv[k]];
+        }
+        for (k = 1; k < m; k++) {
+            ctrlPts[j][k] = [...tmp_fill];
+
+            // solveLU(NvTNv, rhsv[j], sol_v[j], m - 1, indxv);
+
+            // console.log(rhsv[j]);
+            // console.log(sol_v[j]);
+
+            // // for (i = 0; i < dim; i++) {
+            // //     ctrlPts[j][k][i] = sol_v[j][k - 1][i];
+            // // }
+            // ctrlPts[j][k] = [...sol_v[j][k-1]];
+
+            for (i = 0; i < dim; i++) {
+                tmp_1 = [];
+                for (l = 0; l < rhsv[j].length; l++) tmp_1.push(rhsv[j][l][i]);
+                console.log(tmp_1);
+                // solveLU(NvTNv, tmp_1, sol_v[j], m - 1, indxv);
+                solveLU(NvTNv, tmp_1, tmp_1, m - 1, indxv);
+                console.log(tmp_1)
+                // ctrlPts[j][k][i] = sol_v[j][k - 1][i];
+                // ctrlPts[j][k] = [...sol_v[j][k - 1]];
+                ctrlPts[j][k][i] = tmp_1[k - 1];
+            }
+        }
     }
 
     P.push(ctrlPts);
