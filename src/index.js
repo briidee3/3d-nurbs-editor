@@ -45,13 +45,16 @@ import * as THREE from 'three';
 
 import BasicScene from './utils/BasicScene.js';
 // import './utils/SplitElements.js';
-import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ } from './utils/NURBSSurface.js'
+import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ, globalSurfApproxFixednm } from './utils/NURBSSurface.js'
+import { string } from 'mathjs';
+
+import * as testDataFile from './test/flat_lens_map.json';
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const geomResolution = 20;          // Set num slices for NURBS parametric geometry
 const sizeOfCtrlPts = 10;           // Size of ctrl pts
-const showJsonEditor = false;
+const showJsonEditor = true;
 
 // const defaultNurbsParams = {
 //     degree1: 3,
@@ -172,6 +175,42 @@ const defaultNurbsParams = {
     ]
 };
 
+
+// Load locally stored test JSON file (for use testing surface approximation from a 2D array of points representing a series of u/v contours in the xy-plane
+// async function loadPointsJson(filename) {
+//     // const reader = new FileReader();
+//     // // reader.readAsText(filename);
+//     // // return reader.result;
+//     // var out;
+
+//     // reader.onload = (e) => {
+//     //     console.log(e.target.result);
+//     //     out = e.target.result;
+//     // }
+//     // console.log(filename);
+//     // reader.readAsText(String(filename));
+//     // setTimeout(1000);
+
+
+//     try {
+//         const response = await fetch(filename);
+//         if (!response.ok) throw new Error('Failed to load JSON file');
+
+//         const jsonData = await response.json();
+
+//         setTimeout(2000);
+
+//         return jsonData;
+
+        
+//     } catch (e) {
+//         console.error("Couldn't load JSON!");
+//         return -1;
+//     }
+
+// }
+
+
 // Scene setup
 // ------------------------------------
 function main() {
@@ -181,7 +220,7 @@ function main() {
     const canvas = document.querySelector("#viewport");
     const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
     const scene = new THREE.Scene();
-    const sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
+    const sceneSetup = new BasicScene({ dimension: 3, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
     // const raycaster = new THREE.Raycaster();
 
     // var ctrlKeyPressed = false;
@@ -311,7 +350,72 @@ function main() {
     // // Add NURBS after its pts so pts get checked for intersection first
     // makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
-    const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: defaultNurbsParams });
+
+    const curNurbsParams = JSON.parse(JSON.stringify(defaultNurbsParams));
+
+    // Load points for use in approximation. Keep in mind, they're formatted as arrays, not actual point objects (such as THREE.Vector3)
+    // const jsonData = Promise.resolve(loadPointsJson("../test/flat_lens_map.json"));
+    // console.log("JSON DATA");
+    // console.log(jsonData);
+    // console.log(jsonData.value);
+    const jsonData = testDataFile.default;
+    // console.log(jsonData);
+
+    const U = [];   // U knot vec
+    const V = [];   // V knot vec
+    const P = [];   // Ctrl pts
+    
+    // TODO: Add consideration of weights associated w/ data points in jsonData; let weight = 1/weight, since the weight in the JSON data is the distance between the point and the const. U or V value it's supposed to be associated with.
+
+    const numPts_uDir = jsonData.data.length;
+    const numPts_vDir = jsonData.data[0].length;
+    console.log(jsonData)
+    const deg_u = 4;
+    const deg_v = 4;
+    // const numCtrlPts_u = 5;
+    // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
+    const numCtrlPts_u = 21;
+    const numCtrlPts_v = 6;
+    
+    // Get params for approximated surface
+    var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, jsonData.data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P);
+    console.log("U");
+    console.log(U);
+    console.log("V");
+    console.log(V);
+    console.log("P")
+    P_ = P_[0]
+    console.log(P_);
+
+    curNurbsParams.degree1 = deg_u;
+    curNurbsParams.degree2 = deg_v;
+    curNurbsParams.knots1 = U;
+    curNurbsParams.knots2 = V;
+
+    curNurbsParams.ctrlPts = [];
+    curNurbsParams.weights = [];
+    var i, j;
+    for (i = 0; i < P_.length; i++) {
+        curNurbsParams.weights.push([]);
+        curNurbsParams.ctrlPts.push([]);
+        for (j = 0; j < P_[0].length; j++) {
+            curNurbsParams.weights[i].push(1);  // Assuming all weights to be set to 1
+
+            curNurbsParams.ctrlPts[i].push(new THREE.Vector4(P_[i][j][0], P_[i][j][1], 0, 1));
+        }
+    }
+    console.log(curNurbsParams.ctrlPts);
+
+
+    
+
+
+
+    // const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: defaultNurbsParams });
+    const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
+
+    // nurbsObj.scaleNURBSSurface(200);
+
 
     // sceneSetup.sceneObjects.scene.add(nurbsObj);
     // sceneSetup.objects.push(nurbsObj);   // For keeping track
@@ -327,6 +431,8 @@ function main() {
 
     // Handle mouse movement (ref: https://sbcode.net/threejs/mousepick/)
     // const mouse = new THREE.Vector2(0,0);
+
+
 
 
     // Set up controls for nurbs
