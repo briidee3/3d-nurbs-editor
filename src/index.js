@@ -378,12 +378,12 @@ function main() {
     // const numPts_uDir = jsonData.data[0].length;
     console.log(jsonData)
     console.log(data)
-    const deg_u = 4;
-    const deg_v = 4;
+    const deg_u = 2;
+    const deg_v = 2;
     // const numCtrlPts_u = 5;
     // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
-    const numCtrlPts_u = 6;
-    const numCtrlPts_v = 18;
+    const numCtrlPts_u = 9;
+    const numCtrlPts_v = 9;
     
     // Get params for approximated surface
     var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P);
