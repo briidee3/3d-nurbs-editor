@@ -914,7 +914,7 @@ function solveLURow(lu, b, x, n, indx) {
 
 
     if (b.length != n || x.length != n) {
-        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}`);
+        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}; n: ${n}`);
     }
     for (i = 0; i < n; i++) x[i] = b[i];
     // When ii > 0, will beocome index of first nonvanishing element of b. now doing forward substitution
@@ -947,7 +947,7 @@ function solveLU(lu, b, x, n, indx) {
     // console.log(b)
     var i, j, m = b[0].length;
     if (b.length != n || x.length != n || b.length != x.length)
-        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}`);
+        throw new Error(`Bad sizes when solving system of linear equations. b: ${b.length}; x: ${x.length}; n: ${n}`);
     
     // I think this is right?
     const xx = [];
@@ -958,7 +958,7 @@ function solveLU(lu, b, x, n, indx) {
     // Copy and solve each column
     for (j = 0; j < m; j++) {
         for (i = 0; i < n; i++) xx[i] = b[i][j];
-        // solveLURow(lu, xx, xx, n, indx);
+        solveLURow(lu, xx, xx, n, indx);
         for (i = 0; i < n; i++) x[i][j] = xx[i];
     }
 }
@@ -1034,6 +1034,114 @@ function distance3D(p1, p2, asArray = true) {
     }
 }
 
+// TNB 9.4, 9.5, 9.6 + https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/fitting.py#L457
+function curvParams(Q) {
+    const cds = [];
+    cds.length = Q.length + 1;
+    cds.fill(0);
+    cds[cds.length - 1] = 1;
+
+    var i, j, d, sum;
+
+    const uk = [];
+
+    // Calc chord lenfgths
+    for (i = 1; i < Q.length; i++) {
+        d = distance3D(Q[i], Q[i - 1]);
+        cds[i] = Math.sqrt(d);
+    }
+
+    // Find total chord length
+    d = 0;
+    for (i = 1; i < cds.length - 1; i++) d += cds[i];
+
+    for (i = 0; i < Q.length; i++) uk.push(0);
+
+    // Divide each chord length by total chord len
+    for (i = 0; i < Q.length; i++) {
+        sum = 0;
+        for (j = 0; j < i + 1; j++) sum += cds[j];
+        uk[i] = sum / d;
+    }
+    return uk;
+}
+
+
+// Version of surfMeshParams from https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/fitting.py#L457
+/**
+ * @param {*} n - Num data points along u
+ * @param {*} m - Num data points along v
+ * @param {*} Q - Data points to fit to
+ * @param {*} uk - Output for uk
+ * @param {*} vl - Output for vl
+ */
+// function surfParams(n, m, Q, uk, vl) {
+//     uk.length = n;
+//     uk.fill[0];
+
+//     const uk_tmp = [], vl_tmp = [];
+//     var uk_tmp2 = [], vl_tmp2 = [];
+
+//     var i, u, v, pts_u, knots_v, pts_v, knots_u;
+
+//     uk_tmp.length = m;
+//     uk_tmp.fill(0)
+
+//     for (v = 0; v < m; v++) {
+//         pts_u = [];
+//         for (u = 0; u < n; u++) pts_u.push([...Q[u][v]]);
+
+//         uk_tmp2 = curvParams(pts_u);
+
+//         for (u = 0; u < uk_tmp2.length; u++) uk_tmp[u] += uk_tmp2[u];
+//     }
+
+//     // Avging in u dir
+//     for (u = 0; u < n; u++) {
+//         knots_v = [];
+//         for (v = 0; v < m; v++) knots_v.push(uk_tmp[v][u]);
+//         uk[u] = 0;
+//         for (v = 0; v < knots_v.length; v++) uk[u] += knots_v[v];
+//         uk[u] /= m;
+//     }
+
+//     vl.length = m;
+//     vl.fill(0);
+    
+//     for (v = 0; v < m; v++) {
+//         vl_tmp.push([])
+//         vl_tmp[v].length = u;
+//         vl_tmp[v].fill(0);
+//     }
+    
+//     for (u = 0; u < n; u++) {
+//         pts_v = [];
+//         for (v = 0; v < m; v++) pts_v.push([...Q[u][v]]);
+//         // vl_tmp += curvParams(pts_v);
+
+//         vl_tmp2 = curvParams(pts_v);
+
+//         for (v = 0; v < vl_tmp2.length; v++) {
+//             for (i = 0; i < u; i++)
+//                 vl_tmp[v][i] += vl_tmp2[v][i];
+//         }
+//     }
+
+//     // Avging in v dir
+//     for (v = 0; v < m; v++) {
+//         knots_u = [];
+//         for (u = 0; u < n; u++) knots_u.push(vl_tmp[u][v]);
+//         vl[v] = 0;
+//         for (u = 0; u < knots_u.length; u++) vl[v] += knots_u[u];
+//         vl[v] /= n;
+//     }
+
+//     console.log(uk)
+//     console.log(vl)
+
+//     return uk, vl
+// }
+
 
 // TNB Algorithm A9.3
 /**
@@ -1049,7 +1157,7 @@ function surfMeshParams(n, m, Q, uk, vl) {
     // n -= 1;
     // m -= 1;
 
-    // uk.length = n + 1;
+    // uk.length = n;
     uk.length = n + 1;
     uk.fill(0)
     // vl.length = m;
@@ -1256,6 +1364,9 @@ function calcBasisFuncOne(p, U, i, u) {
  * @param {*} p - Degree of nonrational curve (>= 1)
  * @param {*} n - Number of control points in U direction
  * @param {*} r - number of data points in U direction
+ * @param {*} N - Output matrix
+ * @param {*} U - Knot vector
+ * @param {*} ub - Us to use
  */
 function computeN(p, n, r, N, U, ub) {
     var i, j, m_tmp = [];
@@ -1267,11 +1378,11 @@ function computeN(p, n, r, N, U, ub) {
     // }
     
 
-    // for (i = 1; i < r; i++) {
-    for (i = 1; i < n; i++) {
+    for (i = 1; i < r; i++) {
+    // for (i = 1; i < n; i++) {
         m_tmp = [];
-        // for (j = 1; j < n; j++) {
-        for (j = 1; j < r; j++) {
+        for (j = 1; j < n; j++) {
+        // for (j = 1; j < r; j++) {
             m_tmp.push(calcBasisFuncOne(p, U, j, ub[i]));
         }
         // console.log(m_tmp);
@@ -1353,6 +1464,7 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     const ub = [], vb = [];
     
     surfMeshParams(r, s, Q, ub, vb);
+    // surfParams(r, s, Q, ub, vb);
 
     // Compute knots U by Eqs. (9.68), (9.69)
     // U = [];
@@ -1403,7 +1515,7 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     // Compute Nu[][] and NTNu[][] using Eq. (9.66)
     const Nu = [];
     // computeN(p, n, r, Nu, U, ub)
-    computeN(p, n, r, Nu, U, ub)    // previously subbed 1 from n and r
+    computeN(p, n - 1, r - 1, Nu, U, ub)    // previously subbed 1 from n and r
 
     const NuT = math.transpose(Nu);
     const NuTNu = math.multiply(NuT, Nu);
@@ -1450,7 +1562,7 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         // Compute Rku (Eq. 9.63)
         Rku = [];
         // for (i = 1; i < r + 1; i++) {   // r+1 when previously subtracting 1 from r
-        for (i = 1; i < r; i++) {
+        for (i = 1; i < r - 1; i++) {
         // for (i = 1; i < r - 1; i++) {
             n0p = calcBasisFuncOne(p, U, 0, ub[i]);
             // nnp = calcBasisFuncOne(p, U, n, ub[i]);
@@ -1502,7 +1614,7 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         //     }
         // }
         Ru = [];
-        for (i = 1; i < n; i++) {
+        for (i = 1; i < n - 1; i++) {
         // for (i = 1; i < n - 1; i++) {
             // Ru.push([]);
             // for (l = 0; l < dim; l++) {
@@ -1581,11 +1693,11 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
             for (k = 0; k < Ru.length; k++) {
                 tmp_1.push(Ru[k][l]);
             }
-            solveLURow(NuTNu, tmp_1, sol_u[j], n - 1, indxu);
+            solveLURow(NuTNu, tmp_1, sol_u[j], NuTNu.length, indxu);
             for (k = 1; k < n - 1; k++) {
                 tmp[k][j][l] = tmp_1[k - 1];
             }
-            console.log(tmp_1)
+            // console.log(tmp_1)
         }
     }
     // solveLU(NuTNu, rhsu, sol_u, n - 1, indxu);
@@ -1711,13 +1823,13 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
     // }
 
     const Nv = [];
-    computeN(q, m, s, Nv, V, vb)
+    computeN(q, m - 1, s - 1, Nv, V, vb)
     // computeN(q, m + 1, s + 1, Nv, V, vb)
 
     const NvT = math.transpose(Nv);
     const NvTNv = math.multiply(NvT, Nv);
     console.log(Nv)
-    console.log(NvT)
+    // console.log(NvT)
     
     const indxv = [], rhsv = [], sol_v = [];
     // LUDecomposition(NvTNv, NvTNv.length, q, indxv);
@@ -1736,7 +1848,7 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
             // indxu[i].push(0);
         }
     }
-    console.log(NvTNv)
+    // console.log(NvTNv)
 
     const dv = LUdcmp(NvTNv, indxv);
     console.log(NvTNv)
@@ -1773,8 +1885,9 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         Rkv = [];
         // for (i = 1; i < m; i++) {
         // for (i = 1; i < m + 1; i++) {
-        for (i = 1; i < m; i++) {
+        // for (i = 1; i < m; i++) {
         // for (i = 1; i < m - 1; i++) {
+        for (i = 1; i < s - 1; i++) {
             n0p = calcBasisFuncOne(q, V, 0, vb[i]);
             // nnp = calcBasisFuncOne(q, V, m, vb[i]);
             nnp = calcBasisFuncOne(q, V, m - 1, vb[i]);
@@ -1833,8 +1946,8 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         //         }
         //     }
         // }
-        // for (i = 1; i < m - 1; i++) {
-        for (i = 1; i < m; i++) {
+        for (i = 1; i < m - 1; i++) {
+        // for (i = 1; i < m; i++) {
             Rv.push([...tmp_fill]);
             R_tmp = [];
             for (k = 0; k < Rkv.length; k++) {
@@ -1860,8 +1973,8 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
             for (k = 0; k < Rv.length; k++) {
                 tmp_1.push(Rv[k][l]);
             }
-            solveLURow(NvTNv, tmp_1, sol_v[j], m - 1, indxv);
-            console.log(tmp_1)
+            solveLURow(NvTNv, tmp_1, sol_v[j], NvTNv.length, indxv);
+            // console.log(tmp_1)
             for (k = 1; k < m - 1; k++) {
                 // ctrlPts[j][i][l] = tmp_1[k - 1];
                 ctrlPts[j][k][l] = tmp_1[k - 1];
@@ -1899,34 +2012,34 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
         //     }
         // }
 
-        for (k = 0; k < Rv.length; k++) {
-            rhsv[j][k] = [...Rv[k]];
-        }
-        for (k = 1; k < m; k++) {
-            ctrlPts[j][k] = [...tmp_fill];
+        // for (k = 0; k < Rv.length; k++) {
+        //     rhsv[j][k] = [...Rv[k]];
+        // }
+        // for (k = 1; k < m; k++) {
+        //     ctrlPts[j][k] = [...tmp_fill];
 
-            // solveLU(NvTNv, rhsv[j], sol_v[j], m - 1, indxv);
+        //     // solveLU(NvTNv, rhsv[j], sol_v[j], m - 1, indxv);
 
-            // console.log(rhsv[j]);
-            // console.log(sol_v[j]);
+        //     // console.log(rhsv[j]);
+        //     // console.log(sol_v[j]);
 
-            // // for (i = 0; i < dim; i++) {
-            // //     ctrlPts[j][k][i] = sol_v[j][k - 1][i];
-            // // }
-            // ctrlPts[j][k] = [...sol_v[j][k-1]];
+        //     // // for (i = 0; i < dim; i++) {
+        //     // //     ctrlPts[j][k][i] = sol_v[j][k - 1][i];
+        //     // // }
+        //     // ctrlPts[j][k] = [...sol_v[j][k-1]];
 
-            for (i = 0; i < dim; i++) {
-                tmp_1 = [];
-                for (l = 0; l < rhsv[j].length; l++) tmp_1.push(rhsv[j][l][i]);
-                console.log(tmp_1);
-                // solveLU(NvTNv, tmp_1, sol_v[j], m - 1, indxv);
-                solveLU(NvTNv, tmp_1, tmp_1, m - 1, indxv);
-                console.log(tmp_1)
-                // ctrlPts[j][k][i] = sol_v[j][k - 1][i];
-                // ctrlPts[j][k] = [...sol_v[j][k - 1]];
-                ctrlPts[j][k][i] = tmp_1[k - 1];
-            }
-        }
+        //     for (i = 0; i < dim; i++) {
+        //         tmp_1 = [];
+        //         for (l = 0; l < rhsv[j].length; l++) tmp_1.push(rhsv[j][l][i]);
+        //         // console.log(tmp_1);
+        //         // solveLU(NvTNv, tmp_1, sol_v[j], m - 1, indxv);
+        //         solveLU(NvTNv, tmp_1, tmp_1, m - 1, indxv);
+        //         // console.log(tmp_1)
+        //         // ctrlPts[j][k][i] = sol_v[j][k - 1][i];
+        //         // ctrlPts[j][k] = [...sol_v[j][k - 1]];
+        //         ctrlPts[j][k][i] = tmp_1[k - 1];
+        //     }
+        // }
     }
 
     P.push(ctrlPts);
