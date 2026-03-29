@@ -7,8 +7,8 @@ pts = []
 # u_const = 60
 # v_const = 10
 # tol = .3
-num_curves_u = 6 - 1
-num_curves_v = 18 - 1
+num_curves_u = 30 - 1
+num_curves_v = 80 - 1
 
 
 skip = 279
