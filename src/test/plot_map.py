@@ -7,8 +7,8 @@ pts = []
 # u_const = 60
 # v_const = 10
 # tol = .3
-num_curves_u = 30 - 1
-num_curves_v = 80 - 1
+num_curves_u = 10 - 1
+num_curves_v = 22 - 1
 
 
 skip = 279
@@ -95,14 +95,16 @@ def get_nearest_point_to_uv(data, u, v):
 
 data = pts[:, 2:4]
 
-dout = np.zeros([len(u_vals), len(v_vals), 2])
+dout_ = np.zeros([len(u_vals), len(v_vals), 2])
 weights_and_indices = np.zeros([len(u_vals), len(v_vals), 2])   # [ weights, indices ]
 
 
 
 
-for i, u in enumerate(u_vals):
-    for j, v in enumerate(v_vals):
+# for i, u in enumerate(u_vals):
+    # for j, v in enumerate(v_vals):
+for j, v in enumerate(v_vals):
+    for i, u in enumerate(u_vals):
         cur_nearest = get_nearest_point_to_uv(data, u, v)
 
 
@@ -110,9 +112,29 @@ for i, u in enumerate(u_vals):
         # dout[i, j, 0] = cur_pt[0]
         # dout[i, j, 1] = cur_pt[1]
         weights_and_indices[i, j] = cur_nearest
-        dout[i, j, 0] = pts[cur_nearest[0], 0]
-        dout[i, j, 1] = pts[cur_nearest[0], 1]
+        dout_[i, j, 0] = pts[cur_nearest[0], 0]
+        dout_[i, j, 1] = pts[cur_nearest[0], 1]
         # print(cur_nearest[1])
+
+print(dout_.shape)
+#print(dout_[20, 3])
+
+# dout = np.sort(dout_, 3)
+dout = np.array(dout_)
+# dout = np.array(np.rot90(np.rot90(dout_)))
+# dout = np.sort(dout, 1)
+# dout = dout_
+print(dout.shape)
+
+def rotate(dout):
+    for i in range(len(dout)):
+        for j in range(len(dout[0])):
+            tmp = dout[i, j, 0]
+            dout[i,j,0] = dout[i,j,1]
+            dout[i,j,1] = tmp
+
+    return dout
+
 
 
 # Now, we need to make corrections for when nearest is quite far.
@@ -148,6 +170,7 @@ def plot_plots(version = "scatter"):
     plt.xlim(-70, 70)
     plt.ylim(0,20)
 
+    plt.axis('equal')
     plt.show()
     print(pts)
 
@@ -179,3 +202,9 @@ def save_output_json(data, save_weights = False):
 save_output_json(np.rot90(dout), True)
 plot_plots("line")
 # plot_plots()
+
+
+
+
+
+

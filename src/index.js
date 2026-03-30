@@ -220,7 +220,7 @@ function main() {
     const canvas = document.querySelector("#viewport");
     const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
     const scene = new THREE.Scene();
-    const sceneSetup = new BasicScene({ dimension: 3, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
+    const sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
     // const raycaster = new THREE.Raycaster();
 
     // var ctrlKeyPressed = false;
@@ -350,77 +350,103 @@ function main() {
     // // Add NURBS after its pts so pts get checked for intersection first
     // makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
+    const nurbsObj = {};
 
+    const approximateSurfaceFromPoints = true;
+    if (approximateSurfaceFromPoints) {
+        const curNurbsParams = JSON.parse(JSON.stringify(defaultNurbsParams));
 
-    
+        // Load points for use in approximation. Keep in mind, they're formatted as arrays, not actual point objects (such as THREE.Vector3)
+        // const jsonData = Promise.resolve(loadPointsJson("../test/flat_lens_map.json"));
+        // console.log("JSON DATA");
+        // console.log(jsonData);
+        // console.log(jsonData.value);
+        const jsonData = testDataFile.default;
+        // console.log(jsonData);
 
-    const curNurbsParams = JSON.parse(JSON.stringify(defaultNurbsParams));
+        const U = [];   // U knot vec
+        const V = [];   // V knot vec
+        const P = [];   // Ctrl pts
+        
+        // TODO: Add consideration of weights associated w/ data points in jsonData; let weight = 1/weight, since the weight in the JSON data is the distance between the point and the const. U or V value it's supposed to be associated with.
 
-    // Load points for use in approximation. Keep in mind, they're formatted as arrays, not actual point objects (such as THREE.Vector3)
-    // const jsonData = Promise.resolve(loadPointsJson("../test/flat_lens_map.json"));
-    // console.log("JSON DATA");
-    // console.log(jsonData);
-    // console.log(jsonData.value);
-    const jsonData = testDataFile.default;
-    // console.log(jsonData);
+        const data = jsonData.data;
 
-    const U = [];   // U knot vec
-    const V = [];   // V knot vec
-    const P = [];   // Ctrl pts
-    
-    // TODO: Add consideration of weights associated w/ data points in jsonData; let weight = 1/weight, since the weight in the JSON data is the distance between the point and the const. U or V value it's supposed to be associated with.
+        const numPts_uDir = data.length;
+        const numPts_vDir = data[0].length;
+        // const numPts_vDir = jsonData.data.length;
+        // const numPts_uDir = jsonData.data[0].length;
+        console.log(jsonData)
+        console.log(data)
+        const deg_u = 5;
+        const deg_v = 5;
+        // const numCtrlPts_u = 5;
+        // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
+        const numCtrlPts_u = 14; // >= deg_u
+        const numCtrlPts_v = 14; // >= deg_v
 
-    const data = jsonData.data;
+        const weights = jsonData.weights_indices;
+        
+        // Get params for approximated surface
+        var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P, weights);
+        console.log("U");
+        console.log(U);
+        console.log("V");
+        console.log(V);
+        console.log("P")
+        P_ = P_[0]
+        console.log(P_);
 
-    const numPts_uDir = data.length;
-    const numPts_vDir = data[0].length;
-    // const numPts_vDir = jsonData.data.length;
-    // const numPts_uDir = jsonData.data[0].length;
-    console.log(jsonData)
-    console.log(data)
-    const deg_u = 2;
-    const deg_v = 2;
-    // const numCtrlPts_u = 5;
-    // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
-    const numCtrlPts_u = 9;
-    const numCtrlPts_v = 9;
-    
-    // Get params for approximated surface
-    var U_, V_, P_ = globalSurfApproxFixednm(numPts_uDir, numPts_vDir, data, deg_u, deg_v, numCtrlPts_u, numCtrlPts_v, U, V, P);
-    console.log("U");
-    console.log(U);
-    console.log("V");
-    console.log(V);
-    console.log("P")
-    P_ = P_[0]
-    console.log(P_);
+        curNurbsParams.degree1 = deg_u;
+        curNurbsParams.degree2 = deg_v;
+        curNurbsParams.knots1 = U;
+        curNurbsParams.knots2 = V;
 
-    curNurbsParams.degree1 = deg_u;
-    curNurbsParams.degree2 = deg_v;
-    curNurbsParams.knots1 = U;
-    curNurbsParams.knots2 = V;
+        curNurbsParams.ctrlPts = [];
+        curNurbsParams.weights = [];
+        var i, j;
+        for (i = 0; i < P_.length; i++) {
+            curNurbsParams.weights.push([]);
+            curNurbsParams.ctrlPts.push([]);
+            for (j = 0; j < P_[0].length; j++) {
+                curNurbsParams.weights[i].push(1);  // Assuming all weights to be set to 1
 
-    curNurbsParams.ctrlPts = [];
-    curNurbsParams.weights = [];
-    var i, j;
-    for (i = 0; i < P_.length; i++) {
-        curNurbsParams.weights.push([]);
-        curNurbsParams.ctrlPts.push([]);
-        for (j = 0; j < P_[0].length; j++) {
-            curNurbsParams.weights[i].push(1);  // Assuming all weights to be set to 1
-
-            curNurbsParams.ctrlPts[i].push(new THREE.Vector4(P_[i][j][0], P_[i][j][1], 0, 1));
+                curNurbsParams.ctrlPts[i].push(new THREE.Vector4(P_[i][j][0], P_[i][j][1],  i, 1));
+            }
         }
+        console.log(curNurbsParams.ctrlPts);
+
+        nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
     }
-    console.log(curNurbsParams.ctrlPts);
+    else {
+        nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: defaultNurbsParams });
+    }
+
+
+
+    // Create background object to draw
+    const map = new THREE.TextureLoader().load('../test/Figure_3.png');
+    map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.anisotropy = 16;
+    map.colorSpace = THREE.SRGBColorSpace;
+
+    const bg_mat = new THREE.MeshLambertMaterial( { map: map, side: THREE.DoubleSide, opacity: 1, transparent: false } );
+
+    const bg_geom = new THREE.PlaneGeometry(640, 480);
+    const bg = new THREE.Mesh(bg_geom, bg_mat);
+    bg.position.set(0, 0, -2);
+    sceneSetup.addObject(bg);
+    
+
+
 
 
     
 
 
 
-    // const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: defaultNurbsParams });
-    const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
+
+    // const nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
 
     // nurbsObj.scaleNURBSSurface(200);
 

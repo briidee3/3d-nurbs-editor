@@ -1446,9 +1446,10 @@ function computeRku(deg, dataPts, Rku, ub) {
  * @param {Number[]} U - Array to store outut knot vector in U direction in
  * @param {Number[]} V - Array to store output knot vector in V direction in
  * @param {Number[][][]} P - Array to store output control points in
+ * @param {Number[][][]} Q2 - Weights for points, as well as their indices within the dataset
  * @returns U, V, P
  */
-function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
+function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P, Q2) {
     console.log(r)
     console.log(s)
 
@@ -2048,6 +2049,26 @@ function globalSurfApproxFixednm(r, s, Q, p, q, n, m, U, V, P) {
 // console.log(U, V);
 
     return U, V, P;
+}
+
+
+// Surface interpolation
+//https://github.com/orbingol/NURBS-Python/blob/5.x/geomdl/fitting.py#L457
+function surfInterpolation(Q, r, s, p, q, n, m) {
+    const uk = [], vl = [], U = [], V = [];
+
+    surfMeshParams(r, s, Q, uk, vl);
+
+    computeKnots(r, p, n, U, ub);
+    computeKnots(s, q, m, V, vb);
+
+    const ctrlPts = [], pts = [];
+    for (var u = 0; u < r; u++) {
+        pts.push([]);
+        for (var v = 0; v < s; v++) {
+            pts[u].push(ctrlPts_r)
+        }
+    }
 }
 
 
