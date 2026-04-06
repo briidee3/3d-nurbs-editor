@@ -86,6 +86,24 @@ export default class BasicScene {
         this.objects.push(object);
     }
 
+    removeObject(object) {
+        this.sceneObjects.scene.remove(object);
+        
+
+        // Remove object from array without changing address of array (i.e. in-place operations here)
+        const index = this.objects.indexOf(object);
+        
+        // Bring index to end of array
+        let tmp;
+        for (let i = index; i < this.objects.length - 1; i++) {
+            tmp = this.objects[i];
+            this.objects[i] = this.objects[i + 1];
+            this.objects[i + 1] = tmp;
+        }
+        // then pop it
+        this.objects.pop();
+    }
+
     // Handle window resizing (modified from THREEjs FAQ @ https://threejs.org/manual/#en/faq)
     onViewportResize(renderer) {
         //camera.aspect = window.innerWidth / window.innerHeight;
@@ -266,12 +284,16 @@ export default class BasicScene {
     }
 
     setupDragControls() {
+
+
         // Group to hold objects being moved
         this.dragGroup = new THREE.Group();
         this.sceneObjects.scene.add(this.dragGroup);
 
+        console.log(this.objects)
         // Initialize drag controls
-        this.dragControls = new DragControls([ ... this.objects ], this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
+        // this.dragControls = new DragControls([ ... this.objects ], this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
+        this.dragControls = new DragControls(this.objects, this.sceneObjects.camera, this.sceneObjects.renderer.domElement);
         this.dragControls.rotateSpeed = 0;   // Effectively disable rotation
         // this.dragControls.addEventListener('dragstart', this.onDragStart);
         // this.dragControls.addEventListener('drag', this.onDrag);
@@ -290,7 +312,7 @@ export default class BasicScene {
         // Change look of object when dragging
         if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0xaaaaaa);}
 
-        if (typeof event.object !== 'undefined') {
+        if (typeof event.object !== 'undefined' && event.object.hasOwnProperty("position")) {
             const curObj = event.object;
             this.prevStates.push({ object: curObj, position: JSON.parse(JSON.stringify(curObj.position)) });     // Add to undo stack, only position though to prevent stack from getting too big w/ copies of objects
             this.nextStates.length = 0;                                                                          // Wipe nextStates
@@ -310,28 +332,26 @@ export default class BasicScene {
     // }
     
     onDragEnd(event) {
-        if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
+        // if (typeof event.object.material.emissive !== 'undefined') {event.object.material.emissive.set(0x000000);}
 
-        if (typeof event.object !== 'undefined') {
+        if (typeof event.object !== 'undefined' && event.object.hasOwnProperty("parent") && event.object.hasOwnProperty("geometry") && event.object.parent !== null && event.object.parent.hasOwnProperty("geometry") && event.object.parent.hasOwnProperty("name") && event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
             // Regen NURBS mesh upon release if is ctrl pts of nurbs
-            if (event.object.parent.name.includes('nurbs') || event.object.geometry.type === "SphereGeometry" && event.object.parent.geometry.type === "ParametricGeometry") {
-                const done = event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
+            const done = event.object.parent.geometry.userData.parentSurface.handleDragEnd(event);  // send to NURBS object
 
-                if (done) {
-                    this.sceneObjects.canvas.dispatchEvent(event.object.parent.geometry.userData.parentSurface.updateEvent)
-                }
-
-                // Let others know about the update
-                // this.needsUpdate = true
-                
-                // const curId = event.object.name.split(","); // ID contains location in ctrlPts
-                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
-                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
-                // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
-
-                // // Replace the geometry
-                // updateNurbs(nurbsParams, nurbsObj);
+            if (done) {
+                this.sceneObjects.canvas.dispatchEvent(event.object.parent.geometry.userData.parentSurface.updateEvent)
             }
+
+            // Let others know about the update
+            // this.needsUpdate = true
+            
+            // const curId = event.object.name.split(","); // ID contains location in ctrlPts
+            // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].x = event.object.position.x;
+            // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].y = event.object.position.y;
+            // nurbsParams.ctrlPts[Number(curId[0])][Number(curId[1])].z = event.object.position.z;
+
+            // // Replace the geometry
+            // updateNurbs(nurbsParams, nurbsObj);
         }
     }
     
@@ -360,7 +380,7 @@ export default class BasicScene {
     // }
 
     onDrag(event) {
-        if (typeof event.object !== 'undefined') {
+        if (typeof event.object !== 'undefined' && event.object.hasOwnProperty("position")) {
             // Apply movement constraints (if any)
             {
                 // Prevent changes to z axis position
@@ -370,7 +390,7 @@ export default class BasicScene {
     }
 
     onDragVue(event) {
-        if (typeof event.object.target !== 'undefined') {
+        if (typeof event.object !== 'undefined' && typeof event.object.target !== 'undefined' && event.object.hasOwnProperty("position")) {
             // Apply movement constraints (if any)
             {
                 // Prevent changes to z axis position
@@ -380,7 +400,7 @@ export default class BasicScene {
     }
     
     onHoverOn(event) {
-        if (typeof event.object.material.color !== 'undefined') {
+        if (typeof event.object !== 'undefined' && event.object.hasOwnProperty("material") && typeof event.object.material.color !== 'undefined') {
             event.object.material.color.set(0xA0A0A0);
         }
     }
@@ -393,7 +413,7 @@ export default class BasicScene {
     // }
     
     onHoverOff(event) {
-        if (typeof event.object.material.color !== 'undefined') {
+        if (typeof event.object !== 'undefined' && event.object.hasOwnProperty("material") && typeof event.object.material.color !== 'undefined') {
             event.object.material.color.set(0xFFFFFF);
         }
     }

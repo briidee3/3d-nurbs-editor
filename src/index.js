@@ -45,10 +45,11 @@ import * as THREE from 'three';
 
 import BasicScene from './utils/BasicScene.js';
 // import './utils/SplitElements.js';
-import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ, globalSurfApproxFixednm } from './utils/NURBSSurface.js'
+import { SurfaceObject, calcNURBSSurfaceDerivativesXYZ, globalSurfApproxFixednm, nurbsCurveApprox, curvesIntersection } from './utils/NURBSSurface.js'
 import * as math from 'mathjs';
 
 import * as testDataFile from './test/flat_lens_map_weights.json';
+import * as testParams_ from './test/interpolated_surface_test.json';
 
 //import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -220,7 +221,7 @@ function main() {
     const canvas = document.querySelector("#viewport");
     const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
     const scene = new THREE.Scene();
-    const sceneSetup = new BasicScene({ dimension: 2, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
+    const sceneSetup = new BasicScene({ dimension: 3, objects: [], canvas: canvas, renderer: renderer, scene: scene});//, document_: document });
     // const raycaster = new THREE.Raycaster();
 
     // var ctrlKeyPressed = false;
@@ -350,9 +351,12 @@ function main() {
     // // Add NURBS after its pts so pts get checked for intersection first
     // makePointsObjsFromNURBS(nurbsParams, nurbsObj);
 
-    const nurbsObj = {};
+    var nurbsObj = {};
 
-    const approximateSurfaceFromPoints = true;
+    // console.log(fixData());
+
+    const approximateSurfaceFromPoints = false;
+    const useTestParams = true;
     if (approximateSurfaceFromPoints) {
         const curNurbsParams = JSON.parse(JSON.stringify(defaultNurbsParams));
 
@@ -370,7 +374,8 @@ function main() {
         
         // TODO: Add consideration of weights associated w/ data points in jsonData; let weight = 1/weight, since the weight in the JSON data is the distance between the point and the const. U or V value it's supposed to be associated with.
 
-        const data = jsonData.data;
+        // const data = jsonData.data;
+        const data = fixData();
 
         const numPts_uDir = data.length;
         const numPts_vDir = data[0].length;
@@ -378,12 +383,12 @@ function main() {
         // const numPts_uDir = jsonData.data[0].length;
         console.log(jsonData)
         console.log(data)
-        const deg_u = 5;
-        const deg_v = 5;
+        const deg_u = 4;
+        const deg_v = 4;
         // const numCtrlPts_u = 5;
         // const numCtrlPts_v = Math.round(numCtrlPts_u * (numPts_vDir / numPts_uDir));    // Trying to keep ctrl pt number proportional to the width to height ratio of the surface
-        const numCtrlPts_u = 14; // >= deg_u
-        const numCtrlPts_v = 14; // >= deg_v
+        const numCtrlPts_u = 15; // >= deg_u
+        const numCtrlPts_v = 15; // >= deg_v
 
         const weights = jsonData.weights_indices;
         
@@ -411,10 +416,39 @@ function main() {
             for (j = 0; j < P_[0].length; j++) {
                 curNurbsParams.weights[i].push(1);  // Assuming all weights to be set to 1
 
-                curNurbsParams.ctrlPts[i].push(new THREE.Vector4(P_[i][j][0], P_[i][j][1],  i, 1));
+                curNurbsParams.ctrlPts[i].push(new THREE.Vector4(P_[i][j][0], P_[i][j][1], 0, 1));
             }
         }
         console.log(curNurbsParams.ctrlPts);
+
+        nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
+    }
+    else if (useTestParams) {
+        const ctrlPts = [];
+        const weights = []; // assuming all are 1
+        var curPt;
+        const testParams = testParams_.default;
+
+        for (let i = 0; i < testParams.ctrlPts.length; i++) {
+            ctrlPts.push([]);
+            weights.push([]);
+            for (let j = 0; j < testParams.ctrlPts[i].length; j++) {
+                curPt = testParams.ctrlPts[i][j];
+                ctrlPts[i].push(new THREE.Vector4(curPt[0], curPt[1], 0, 1));
+                weights[i].push(1);
+            }
+        }
+        console.log(ctrlPts)
+
+        const curNurbsParams = {
+            ctrlPts: ctrlPts,
+            weights: weights,
+            degree1: testParams.degree1,
+            degree2: testParams.degree2,
+            knots1: testParams.knots1,
+            knots2: testParams.knots2
+        };
+        
 
         nurbsObj = new SurfaceObject({ threeScene: sceneSetup, nurbsParams: curNurbsParams });
     }
@@ -750,4 +784,141 @@ function main() {
     sceneSetup.setupViewportResizeObserver();
 }
 
+
+function generateCurves(numCptsU, numCptsV, degU, degV) {
+
+    const data = testDataFile.default.data;
+    const weights = testDataFile.default.weights_indices;
+
+    // Generate curves for use generating a Gordon surface
+    const curvesJson = {
+        u: [],
+        v: [],
+        uErr: [],
+        vErr: []
+    };
+    const tol = 3;
+    var i, j;
+
+    // curvesJson.u.length = data.length;
+    // curvesJson.v.length = data[0].length;
+    // curvesJson.u.fill([]);
+    // curvesJson.v.fill([]);
+
+    // Get u curves
+    for (i = 0; i < data.length; i++) {
+        curvesJson.u.push([]);
+        curvesJson.uErr.push([]);
+        for (j = 0; j < data[0].length; j++) {
+            // curvesJson.u.push({
+            //     x: data[i][j][0],
+            //     y: data[i][j][1]
+            // });
+            
+            curvesJson.u[i].push([
+                data[i][j][0],
+                data[i][j][1]
+            ]);
+            curvesJson.uErr[i].push(weights[j][i][1]);
+        }
+    }
+
+    // Get v curves
+    for (i = 0; i < data[0].length; i++) {
+        curvesJson.v.push([]);
+        curvesJson.vErr.push([]);
+        for (j = 0; j < data.length; j++) {
+            // curvesJson.v.push({
+            //     x: data[j][i][0],
+            //     y: data[j][i][1]
+            // });
+            curvesJson.v[i].push([
+                data[j][i][0],
+                data[j][i][1]
+            ]);
+            curvesJson.vErr[i].push(weights[i][j][1]);
+        }
+    }
+
+    // console.log(curvesJson)
+
+    const curvesOut = {
+        u: [],
+        v: []
+    };
+
+    const uLen = data.length, vLen = data[0].length;
+    var curNumCptsU, curNumCptsV;
+
+    // Get the approximate NURBS curves for each of them
+    for (i = 0; i < curvesJson.u.length; i++) {
+        // curNumCptsU = numCptsU * curvesJson.u[i].length / 
+        curvesOut.u.push(nurbsCurveApprox(curvesJson.u[i], degU, numCptsU, curvesJson.uErr[i]));
+    }
+    for (i = 0; i < curvesJson.v.length; i++) {
+        curvesOut.v.push(nurbsCurveApprox(curvesJson.v[i], degV, numCptsV, curvesJson.vErr[i]));
+    }
+
+    return curvesOut;
+}
+
+
+function fixData() {
+    const degU = 3, degV = 3, numCptsU = 8, numCptsV = 8;
+    const maxIterations = 300;
+    const approximateMissing = false;
+
+    const curvesOut = generateCurves(numCptsU, numCptsV, degU, degV);
+    console.log(curvesOut)
+
+    var i, j, k;
+    const tol = 3;
+
+    // Convert generated curves to point objects from arrays
+    for (i = 0; i < curvesOut.u.length; i++) {
+        for (j = 0; j < curvesOut.u[i].ctrlPts.length; j++) {
+            const curPt = curvesOut.u[i].ctrlPts[j];
+            curvesOut.u[i].ctrlPts[j] = new THREE.Vector4(curPt[0], curPt[1], 0, 1);
+        }
+    }
+    for (i = 0; i < curvesOut.v.length; i++) {
+        for (j = 0; j < curvesOut.v[i].ctrlPts.length; j++) {
+            const curPt = curvesOut.v[i].ctrlPts[j];
+            curvesOut.v[i].ctrlPts[j] = new THREE.Vector4(curPt[0], curPt[1], 0, 1);
+        }
+    }
+
+    const data = [...testDataFile.default.data];
+    const weights = [...testDataFile.default.weights_indices];
+    var tmp, tmp2;
+    console.log(data)
+
+    if (approximateMissing) {
+        // Go thru all of the points that have high "weights" and approximate new ones based on intersections between curves associated w the point
+        for (i = 0; i < data.length; i++) {
+            for (j = 0; j < data[0].length; j++) {
+                // console.log(weights[j][i])
+                console.log(weights[j][i])
+                if (weights[j][i][1] > tol) {
+                    tmp = curvesIntersection(curvesOut.u[i].deg, curvesOut.u[i].knots, curvesOut.u[i].ctrlPts, curvesOut.v[i].deg, curvesOut.v[i].knots, curvesOut.v[i].ctrlPts, maxIterations);
+                    tmp2 = [tmp[0].x, tmp[0].y];
+                    console.log(tmp);
+                    console.log([...tmp2]);
+                    console.log({...data[i][j]});
+                    data[i][j] = [...tmp2];
+                }
+            }
+        }
+        console.log(data)
+    }
+
+    return data;
+}
+
+
+
+
+
+
+// Do the thing
 main();
