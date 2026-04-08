@@ -262,7 +262,11 @@ def gen_surf():
     #     for i in gso.keys():
     #         gso[i] = np.ndarray(gso[i]).tolist()
     #     json.dump(gso, file)
-    data = get_dout(15 - 1, 15 - 1)
+
+    nu = 5
+    nv = 7
+
+    data = get_dout(nu - 1, nv - 1)
     pts = []
     dout = data['data']
 
@@ -270,7 +274,7 @@ def gen_surf():
         for j in range(len(dout[i])):
             pts.append(tuple(dout[i, j].tolist()))
     
-    surface = fitting.interpolate_surface(pts, 15, 15, 4, 4)
+    surface = fitting.interpolate_surface(pts, nv, nu, 4, 4)
     # surface = fitting.approximate_surface(pts, 30, 30, 4, 4, ctrlpts_size_u = 5, ctrlpts_size_v = 5)
 
     print(surface)
